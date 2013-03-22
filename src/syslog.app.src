@@ -1,0 +1,21 @@
+{application, syslog,
+  [{description, "A Syslog based logger for error_logger reports."},
+   {id, "com.github.schlagert"},
+   {vsn, "0.0.9"},
+   {registered,
+    [
+     syslog,
+     syslog_monitor
+    ]},
+   {applications, [kernel, stdlib, sasl]},
+   {mod, {syslog, []}},
+   {env,
+    [
+     {enabled,         true},
+     {protocol,        rfc3164},
+     {dest_host,       {127,0,0,1}},
+     {dest_port,       auto},
+     {facility,        local0},
+     {error_facility,  local0},
+     {use_rfc5424_bom, false}
+    ]}]}.
