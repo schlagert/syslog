@@ -22,8 +22,6 @@
 -record(syslog_report, {
           severity  :: 0..7,
           facility  :: 0..23,
-          dest_host :: inet:ip_address() | inet:hostname(),
-          dest_port :: inet:port_number(),
           timestamp :: erlang:timestamp(),
           hostname  :: string(),
           appname   :: string(),

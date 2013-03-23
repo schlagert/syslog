@@ -100,8 +100,6 @@ code_change(_OldVsn, State, _Extra) -> State.
 %% @private
 %%------------------------------------------------------------------------------
 terminate(_Reason, #state{socket = undefined}) ->
-    syslog_h:detach(),
     ok;
 terminate(_Reason, #state{socket = Socket}) ->
-    syslog_h:detach(),
     gen_udp:close(Socket).

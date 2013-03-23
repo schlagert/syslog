@@ -23,7 +23,7 @@
 -behaviour(gen_event).
 
 %% API
--export([attach/1, detach/0]).
+-export([attach/1]).
 
 %% gen_event callbacks
 -export([init/1,
@@ -43,7 +43,7 @@
 %% This is the behaviour that must be implemented by protocol backends.
 %%------------------------------------------------------------------------------
 
--callback send(gen_udp:socket(), #syslog_report{}) -> ok | {error, term()}.
+-callback to_iolist(#syslog_report{}) -> iolist().
 
 %%%=============================================================================
 %%% API
@@ -53,19 +53,12 @@
 %% @doc
 %% Attach this module as event handler for `error_logger' events. The
 %% connection between the event manager and the handler will be supervised by
-%% the calling process.
+%% the calling process. The handler will automatically be detached when the
+%% calling process exits.
 %% @end
 %%------------------------------------------------------------------------------
 -spec attach(gen_udp:socket()) -> ok | term().
 attach(Socket) -> gen_event:add_sup_handler(error_logger, ?MODULE, [Socket]).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Detaches this module from the `error_logger' event manager.
-%% @end
-%%------------------------------------------------------------------------------
--spec detach() -> ok | term().
-detach() -> gen_event:delete_handler(error_logger, ?MODULE, []).
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -152,8 +145,6 @@ format_msg(Severity, Pid, Fmt, Args, State) ->
     #syslog_report{
        severity  = get_severity(Severity),
        facility  = get_facility(Severity, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -169,8 +160,6 @@ format_report(_, Pid, crash_report, Report, State) ->
     #syslog_report{
        severity  = get_severity(critical),
        facility  = get_facility(critical, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -182,8 +171,6 @@ format_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
     #syslog_report{
        severity  = get_severity(informational),
        facility  = get_facility(informational, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -195,8 +182,6 @@ format_report(_, Pid, _, [{application, A}, {exited, R} | _], State) ->
     #syslog_report{
        severity  = get_severity(error),
        facility  = get_facility(error, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -210,8 +195,6 @@ format_report(_, Pid, _, [{started, Details} | _], State) ->
     #syslog_report{
        severity  = get_severity(informational),
        facility  = get_facility(informational, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -233,8 +216,6 @@ format_report(_, Pid, supervisor_report, Report, State) ->
     #syslog_report{
        severity  = get_severity(error),
        facility  = get_facility(error, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -246,8 +227,6 @@ format_report(_, Pid, syslog, [{args, A}, {fmt, F}, {severity, S} | _], State) -
     #syslog_report{
        severity  = get_severity(S),
        facility  = get_facility(S, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -259,8 +238,6 @@ format_report(Severity, Pid, _Type, Report, State) ->
     #syslog_report{
        severity  = get_severity(Severity),
        facility  = get_facility(Severity, State),
-       dest_host = State#state.dest_host,
-       dest_port = State#state.dest_port,
        timestamp = os:timestamp(),
        hostname  = State#state.hostname,
        appname   = State#state.appname,
@@ -272,9 +249,17 @@ format_report(Severity, Pid, _Type, Report, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send(SyslogReport, State = #state{socket = Socket, protocol = Protocol}) ->
-    ok = Protocol:send(Socket, SyslogReport),
+send(R = #syslog_report{msg = M}, State) ->
+    send([R#syslog_report{msg = L} || L <- string:tokens(M, "\n")], State);
+send(Rs, State = #state{protocol = Protocol}) when is_list(Rs) ->
+    [send_datagram(Protocol:to_iolist(R), State) || R <- Rs],
     State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+send_datagram(Data, #state{socket = S, dest_host = H, dest_port = P}) ->
+    ok = gen_udp:send(S, H, P, Data).
 
 %%------------------------------------------------------------------------------
 %% @private

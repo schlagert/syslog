@@ -20,7 +20,7 @@
 -behaviour(syslog_h).
 
 %% API
--export([send/2]).
+-export([to_iolist/1]).
 
 -include("syslog.hrl").
 
@@ -30,33 +30,10 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Send the given report using the provided socket.
+%% Returns an `iolist' containing an RFC3164 compliant syslog report. 
 %% @end
 %%------------------------------------------------------------------------------
--spec send(gen_udp:socket(), #syslog_report{}) -> ok | {error, term()}.
-send(Socket, Report = #syslog_report{msg = Msg}) ->
-    Lines = string:tokens(Msg, "\n"),
-    send_impl(Socket, [Report#syslog_report{msg = Line} || Line <- Lines]).
-
-%%%=============================================================================
-%%% internal functions
-%%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
--spec send_impl(gen_udp:socket(), [#syslog_report{}]) -> ok | {error, term()}.
-send_impl(Socket, Reports) when is_list(Reports) ->
-    lists:foldl(
-      fun(R = #syslog_report{dest_host = H, dest_port = P}, ok) ->
-              gen_udp:send(Socket, H, P, to_iolist(R));
-         (_, Error) ->
-              Error
-      end, ok, Reports).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
+-spec to_iolist(#syslog_report{}) -> iolist().
 to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
     [
      $<,
@@ -77,6 +54,10 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $\s,
      truncate(512, Report#syslog_report.msg)
     ].
+
+%%%=============================================================================
+%%% internal functions
+%%%=============================================================================
 
 %%------------------------------------------------------------------------------
 %% @private
