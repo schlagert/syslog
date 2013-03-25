@@ -24,6 +24,7 @@
           facility  :: 0..23,
           timestamp :: erlang:timestamp(),
           hostname  :: string(),
+          domain    :: string(),
           appname   :: string(),
           beam_pid  :: string(),
           pid       :: string(),

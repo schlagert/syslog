@@ -72,6 +72,7 @@ attach(Socket) -> gen_event:add_sup_handler(error_logger, ?MODULE, [Socket]).
           dest_host      :: inet:ip_address() | inet:hostname(),
           dest_port      :: inet:port_number(),
           hostname       :: string(),
+          domain         :: string(),
           appname        :: string(),
           beam_pid       :: string(),
           bom            :: binary()}).
@@ -91,8 +92,9 @@ init([Socket]) ->
             error_facility = proplists:get_value(error_facility, Env, ?FACILITY),
             dest_host      = proplists:get_value(dest_host, Env, ?DEST_HOST),
             dest_port      = Port,
-            hostname       = get_hostname(atom_to_list(node())),
-            appname        = get_appname(atom_to_list(node())),
+            hostname       = get_hostname(),
+            domain         = get_domain(),
+            appname        = get_appname(),
             beam_pid       = os:getpid(),
             bom            = get_bom(UseBOM)}}.
 
@@ -142,109 +144,73 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %% @private
 %%------------------------------------------------------------------------------
 format_msg(Severity, Pid, Fmt, Args, State) ->
-    #syslog_report{
-       severity  = get_severity(Severity),
-       facility  = get_facility(Severity, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format(Fmt, Args)}.
+    (get_report(State))#syslog_report{
+      severity  = get_severity(Severity),
+      facility  = get_facility(Severity, State),
+      timestamp = os:timestamp(),
+      pid       = get_pid(Pid),
+      msg       = format(Fmt, Args)}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 format_report(_, Pid, crash_report, Report, State) ->
-    #syslog_report{
-       severity  = get_severity(critical),
-       facility  = get_facility(critical, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format("=CRASH REPORT====~n~s", [proc_lib:format(Report)])};
+    Timestamp = os:timestamp(),
+    Event = {calendar:now_to_local_time(Timestamp),
+             {error_report, self(), {Pid, crash_report, Report}}},
+    (get_report(State))#syslog_report{
+      severity  = get_severity(critical),
+      facility  = get_facility(critical, State),
+      timestamp = Timestamp,
+      pid       = get_pid(Pid),
+      msg       = sasl_report:format_report(fd, crash_report, Event)};
 format_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
-    #syslog_report{
-       severity  = get_severity(informational),
-       facility  = get_facility(informational, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format("started application ~w on node ~w", [A, N])};
+    (get_report(State))#syslog_report{
+      severity  = get_severity(informational),
+      facility  = get_facility(informational, State),
+      timestamp = os:timestamp(),
+      pid       = get_pid(Pid),
+      msg       = format("started application ~w on node ~w", [A, N])};
 format_report(_, Pid, _, [{application, A}, {exited, R} | _], State) ->
-    #syslog_report{
-       severity  = get_severity(error),
-       facility  = get_facility(error, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format("application ~w exited with ~768p", [A, R])};
+    (get_report(State))#syslog_report{
+      severity  = get_severity(error),
+      facility  = get_facility(error, State),
+      timestamp = os:timestamp(),
+      pid       = get_pid(Pid),
+      msg       = format("application ~w exited with ~768p", [A, R])};
 format_report(_, Pid, _, [{started, Details} | _], State) ->
     Child = get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
-    #syslog_report{
-       severity  = get_severity(informational),
-       facility  = get_facility(informational, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format("started child ~s using ~768p", [Child, Mfargs])};
+    (get_report(State))#syslog_report{
+      severity  = get_severity(informational),
+      facility  = get_facility(informational, State),
+      timestamp = os:timestamp(),
+      pid       = get_pid(Pid),
+      msg       = format("started child ~s using ~768p", [Child, Mfargs])};
 format_report(_, Pid, supervisor_report, Report, State) ->
-    Name = proplists:get_value(supervisor, Report, ""),
-    Context = proplists:get_value(errorContext, Report, ""),
-    Reason = proplists:get_value(reason, Report, ""),
-    Offender = proplists:get_value(offender, Report, ""),
-    Msg = format("=SUPERVISOR REPORT====~n"
-                 "     Supervisor: ~p~n"
-                 "     Context:    ~p~n"
-                 "     Reason:     ~80.18p~n"
-                 "     Offender:   ~80.18p~n~n",
-                 [Name, Context, Reason, Offender]),
-    #syslog_report{
-       severity  = get_severity(error),
-       facility  = get_facility(error, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = Msg};
+    Timestamp = os:timestamp(),
+    Event = {calendar:now_to_local_time(Timestamp),
+             {info_report, self(), {Pid, supervisor_report, Report}}},
+    (get_report(State))#syslog_report{
+      severity  = get_severity(error),
+      facility  = get_facility(error, State),
+      timestamp = Timestamp,
+      pid       = get_pid(Pid),
+      msg       = sasl_report:format_report(fd, supervisor_report, Event)};
 format_report(_, Pid, syslog, [{args, A}, {fmt, F}, {severity, S} | _], State) ->
-    #syslog_report{
-       severity  = get_severity(S),
-       facility  = get_facility(S, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format(F, A)};
+    (get_report(State))#syslog_report{
+      severity  = get_severity(S),
+      facility  = get_facility(S, State),
+      timestamp = os:timestamp(),
+      pid       = get_pid(Pid),
+      msg       = format(F, A)};
 format_report(Severity, Pid, _Type, Report, State) ->
-    #syslog_report{
-       severity  = get_severity(Severity),
-       facility  = get_facility(Severity, State),
-       timestamp = os:timestamp(),
-       hostname  = State#state.hostname,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       pid       = get_pid(Pid),
-       bom       = State#state.bom,
-       msg       = format(Report)}.
+    (get_report(State))#syslog_report{
+      severity  = get_severity(Severity),
+      facility  = get_facility(Severity, State),
+      timestamp = os:timestamp(),
+      pid       = get_pid(Pid),
+      msg       = format(Report)}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -283,12 +249,32 @@ format(Report) -> format("~p", [Report]).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+get_report(State) ->
+    #syslog_report{
+       hostname  = State#state.hostname,
+       domain    = State#state.domain,
+       appname   = State#state.appname,
+       beam_pid  = State#state.beam_pid,
+       bom       = State#state.bom}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_hostname()                -> get_hostname(atom_to_list(node())).
 get_hostname("nonode@nohost") -> {ok, Hostname} = inet:gethostname(), Hostname;
 get_hostname(Node)            -> hd(lists:reverse(string:tokens(Node, "@"))).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+get_domain()           -> get_domain(string:tokens(get_hostname(), ".")).
+get_domain([_])        -> "";
+get_domain([_ | Rest]) -> string:join(Rest, ".").
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_appname()                -> get_appname(atom_to_list(node())).
 get_appname("nonode@nohost") -> "beam";
 get_appname(Node)            -> hd(string:tokens(Node, "@")).
 
@@ -364,3 +350,29 @@ get_severity(warning)       -> 4;
 get_severity(notice)        -> 5;
 get_severity(informational) -> 6;
 get_severity(debug)         -> 7.
+
+%%%=============================================================================
+%%% TESTS
+%%%=============================================================================
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+get_hostname_test() ->
+    {ok, InetReturn} = inet:gethostname(),
+    ?assertEqual(InetReturn,        get_hostname("nonode@nohost")),
+    ?assertEqual("hostname",        get_hostname("nodename@hostname")),
+    ?assertEqual("hostname.domain", get_hostname("nodename@hostname.domain")).
+
+get_domain_test() ->
+    ?assertEqual("",          get_domain(string:tokens("host", "."))),
+    ?assertEqual("domain",    get_domain(string:tokens("host.domain", "."))),
+    ?assertEqual("domain.de", get_domain(string:tokens("host.domain.de", "."))).
+
+get_appname_test() ->
+    ?assertEqual("beam",     get_appname("nonode@nohost")),
+    ?assertEqual("nodename", get_appname("nodename@hostname")),
+    ?assertEqual("nodename", get_appname("nodename@hostname.dom.ain")).
+
+-endif. %% TEST
