@@ -30,7 +30,7 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns an `iolist' containing an RFC5424 compliant syslog report. 
+%% Returns an `iolist' containing an RFC5424 compliant syslog report.
 %% @end
 %%------------------------------------------------------------------------------
 -spec to_iolist(#syslog_report{}) -> iolist().
@@ -47,14 +47,14 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $\s,
      truncate(48, Report#syslog_report.appname),
      $\s,
-     truncate(128, Report#syslog_report.beam_pid),
+     truncate(12, Report#syslog_report.beam_pid),
      $\s,
      truncate(32, Report#syslog_report.pid),
      $\s,
      $-,
      $\s,
      Report#syslog_report.bom,
-     truncate(1536, unicode:characters_to_binary(Report#syslog_report.msg))
+     unicode:characters_to_binary(Report#syslog_report.msg)
     ].
 
 %%%=============================================================================
@@ -73,17 +73,5 @@ rfc5424_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-truncate(Limit, String) when is_list(String) ->
-    case string:substr(String, 1, Limit) of
-        String ->
-            String;
-        Shortened ->
-            [Shortened, "..."]
-    end;
-truncate(Limit, Binary) when is_binary(Binary) ->
-    case Binary of
-        <<Shortened:Limit/binary, _/binary>> ->
-            [Shortened, "..."];
-        _ ->
-            Binary
-    end.
+truncate(L, S) when length(S) =< L -> S;
+truncate(L, S)                     -> string:substr(S, 1, L).
