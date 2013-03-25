@@ -59,28 +59,26 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Enable SASL report logging via `syslog'. This will also disable the SASL TTY
-%% output, if successful.
+%% Enable SASL report logging via `syslog'. This will also disable the standard
+%% `error_logger' TTY output, if successful.
 %% @end
 %%------------------------------------------------------------------------------
 -spec enable() -> ok.
 enable() ->
     supervisor:delete_child(?MODULE, ?CHILD),
     {ok, _} = supervisor:start_child(?MODULE, ?SPEC),
-    error_logger:delete_report_handler(sasl_report_tty_h),
     error_logger:tty(false).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Disable SASL report logging via `syslog'. This will also re-enable the SASL
-%% TTY output, if successful.
+%% Disable SASL report logging via `syslog'. This will also re-enable the
+%% standard `error_logger' TTY output, if successful.
 %% @end
 %%------------------------------------------------------------------------------
 -spec disable() -> ok.
 disable() ->
-    supervisor:terminate_child(?MODULE, ?CHILD),
+    ok = supervisor:terminate_child(?MODULE, ?CHILD),
     supervisor:delete_child(?MODULE, ?CHILD),
-    error_logger:add_report_handler(sasl_report_tty_h, all),
     error_logger:tty(true).
 
 %%------------------------------------------------------------------------------
