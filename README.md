@@ -28,6 +28,9 @@ Configuration
 The following configuration options are available and can be configured in the
 application environment:
 
+* `{enabled, boolean()}`
+  Indicating whether Syslog reporting should be started when the `syslog`
+  application gets started. Default is `true`.
 * `{protocol, rfc3164 | rfc5424}`
   Specifies which protocol standard should be used to format outgoing Syslog
   packets. Default is `rfc3164`.

@@ -15,7 +15,7 @@
      {protocol,        rfc3164},
      {dest_host,       {127,0,0,1}},
      {dest_port,       auto},
-     {facility,        local0},
-     {error_facility,  local0},
+     {facility,        daemon},
+     {error_facility,  daemon},
      {use_rfc5424_bom, false}
     ]}]}.
