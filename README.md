@@ -25,4 +25,32 @@ Features
 Configuration
 -------------
 
-TODO
+The following configuration options are available and can be configured in the
+application environment:
+
+* `{protocol, rfc3164 | rfc5424}`
+  Specifies which protocol standard should be used to format outgoing Syslog
+  packets. Default is `rfc3164`.
+* `{use_rfc5424_bom, boolean()}`
+  Specifies whether the RFC5424 protocol backend should include the UTF-8 BOM in
+  the message part of a Syslog packet. Default is `false'.
+* `{dest_host, inet:ip_address() | inet:hostname()}`
+  Specifies the host to which Syslog packets will be sent. Default is
+  `{127, 0, 0, 1}`.
+* `{dest_port, auto | inet:port_number()}`
+  Specifies the port to which Syslog packets will be sent. Default is `auto`.
+* `{facility, facility()}`
+  Specifies the facility Syslog packets will be sent with. Default is `daemon`.
+* `{error_facility, facility()}`
+  Specifies the facility Syslog packets with severity `error` or `critical` will
+  be sent with. Default is `daemon`.
+
+The `syslog` application will not touch the standard SASL report handlers
+attached to the `error_logger` when SASL starts. However, having SASL progress
+reports on TTY can be quite annoying when trying to use the shell. The correct
+way to disable this output is to configure the SASL application in the
+`sys.config` of a release, e.g. the following line will command SASL to not
+attach any TTY handlers to `error_logger`:
+```erlang
+{sasl, [{sasl_error_logger, false}]}
+```
