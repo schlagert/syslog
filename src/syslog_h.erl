@@ -177,7 +177,7 @@ format_report(_, Pid, _, [{application, A}, {exited, R} | _], State) ->
       facility  = get_facility(error, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
-      msg       = format("application ~w exited with ~768p", [A, R])};
+      msg       = format("application ~w exited with ~512p", [A, R])};
 format_report(_, Pid, _, [{started, Details} | _], State) ->
     Child = get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
@@ -186,7 +186,7 @@ format_report(_, Pid, _, [{started, Details} | _], State) ->
       facility  = get_facility(informational, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
-      msg       = format("started child ~s using ~768p", [Child, Mfargs])};
+      msg       = format("started child ~s using ~512p", [Child, Mfargs])};
 format_report(_, Pid, supervisor_report, Report, State) ->
     Timestamp = os:timestamp(),
     Event = {calendar:now_to_local_time(Timestamp),
@@ -237,14 +237,14 @@ format(Fmt, Args) ->
         Class:Exception ->
             lists:flatten(
               io_lib:format(
-                "io_lib:format(~256p, ~256p) crashed: ~32p:~512p",
+                "io_lib:format(~256p, ~256p) crashed: ~16p:~256p",
                 [Fmt, Args, Class, Exception]))
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-format(Report) -> format("~p", [Report]).
+format(Report) -> format("~512p", [Report]).
 
 %%------------------------------------------------------------------------------
 %% @private
