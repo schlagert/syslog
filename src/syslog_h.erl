@@ -163,7 +163,7 @@ format_report(_, Pid, crash_report, Report, State) ->
       facility  = get_facility(critical, State),
       timestamp = Timestamp,
       pid       = get_pid(Pid),
-      msg       = sasl_report:format_report(fd, crash_report, Event)};
+      msg       = lists:flatten(sasl_report:format_report(fd, all, Event))};
 format_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
     (get_report(State))#syslog_report{
       severity  = get_severity(informational),
@@ -178,7 +178,8 @@ format_report(_, Pid, _, [{application, A}, {exited, R} | _], State) ->
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format("application ~w exited with ~512p", [A, R])};
-format_report(_, Pid, _, [{started, Details} | _], State) ->
+format_report(_, Pid, progress, Report, State) ->
+    Details = proplists:get_value(started, Report, []),
     Child = get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
     (get_report(State))#syslog_report{
@@ -190,13 +191,13 @@ format_report(_, Pid, _, [{started, Details} | _], State) ->
 format_report(_, Pid, supervisor_report, Report, State) ->
     Timestamp = os:timestamp(),
     Event = {calendar:now_to_local_time(Timestamp),
-             {info_report, self(), {Pid, supervisor_report, Report}}},
+             {error_report, self(), {Pid, supervisor_report, Report}}},
     (get_report(State))#syslog_report{
       severity  = get_severity(error),
       facility  = get_facility(error, State),
       timestamp = Timestamp,
       pid       = get_pid(Pid),
-      msg       = sasl_report:format_report(fd, supervisor_report, Event)};
+      msg       = lists:flatten(sasl_report:format_report(fd, all, Event))};
 format_report(_, Pid, syslog, [{args, A}, {fmt, F}, {severity, S} | _], State) ->
     (get_report(State))#syslog_report{
       severity  = get_severity(S),
