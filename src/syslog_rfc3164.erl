@@ -30,7 +30,7 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns an `iolist' containing an RFC3164 compliant syslog report. 
+%% Returns an `iolist' containing an RFC3164 compliant syslog report.
 %% @end
 %%------------------------------------------------------------------------------
 -spec to_iolist(#syslog_report{}) -> iolist().
@@ -41,18 +41,18 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $>,
      rfc3164_date(Report),
      $\s,
-     truncate(255, Report#syslog_report.hostname),
+     rfc3164_hostname(Report),
      $\s,
-     truncate(48, Report#syslog_report.appname),
+     Report#syslog_report.appname,
      $[,
-     truncate(128, Report#syslog_report.beam_pid),
+     Report#syslog_report.beam_pid,
      $],
      $\s,
-     truncate(32, Report#syslog_report.pid),
+     Report#syslog_report.pid,
      $\s,
      $\-,
      $\s,
-     truncate(512, Report#syslog_report.msg)
+     Report#syslog_report.msg
     ].
 
 %%%=============================================================================
@@ -70,13 +70,12 @@ rfc3164_date({{_, Mo, D}, {H, Mi, S}}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-truncate(Limit, String) ->
-    case string:substr(String, 1, Limit) of
-        String ->
-            String;
-        Shortened ->
-            [Shortened, "..."]
-    end.
+rfc3164_hostname(#syslog_report{hostname = H, domain = D}) ->
+    rfc3164_hostname(H, string:rstr(H, [$. | D])).
+rfc3164_hostname(Hostname, Occurence) when Occurence > 2 ->
+    string:sub_string(Hostname, 1, Occurence - 1);
+rfc3164_hostname(Hostname, _) ->
+    Hostname.
 
 %%------------------------------------------------------------------------------
 %% @private
