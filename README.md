@@ -11,6 +11,9 @@ borrowed from the [lager](http://github.com/basho/lager) project, e.g. having
 the possibility to log into separate files for `info` and `error` or `progress`
 reports.
 
+* [Code](http://github.com/schlagert/syslog)
+* [EDoc](http://schlagert.github.com/syslog)
+
 Features
 --------
 
