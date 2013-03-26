@@ -35,6 +35,8 @@
 
 -include("syslog.hrl").
 
+-define(GET_ENV(Property), application:get_env(syslog, Property)).
+
 %%%=============================================================================
 %%% callback definitions
 %%%=============================================================================
@@ -81,22 +83,18 @@ attach(Socket) -> gen_event:add_sup_handler(error_logger, ?MODULE, [Socket]).
 %% @private
 %%------------------------------------------------------------------------------
 init([Socket]) ->
-    Env = application:get_all_env(syslog),
-    Protocol = proplists:get_value(protocol, Env, ?PROTOCOL),
-    Port = get_port(proplists:get_value(dest_port, Env, ?DEST_PORT), Protocol),
-    UseBOM = proplists:get_value(use_rfc5424_bom, Env, ?USE_BOM),
     {ok, #state{
             socket         = Socket,
-            protocol       = get_module(Protocol),
-            facility       = proplists:get_value(facility, Env, ?FACILITY),
-            error_facility = proplists:get_value(error_facility, Env, ?FACILITY),
-            dest_host      = proplists:get_value(dest_host, Env, ?DEST_HOST),
-            dest_port      = Port,
+            protocol       = get_protocol(get_property(protocol, ?PROTOCOL)),
+            facility       = get_property(facility, ?FACILITY),
+            error_facility = get_property(error_facility, ?FACILITY),
+            dest_host      = get_property(dest_host, ?DEST_HOST),
+            dest_port      = get_property(dest_port, ?DEST_PORT),
             hostname       = get_hostname(),
             domain         = get_domain(),
             appname        = get_appname(),
             beam_pid       = os:getpid(),
-            bom            = get_bom(UseBOM)}}.
+            bom            = get_bom()}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -145,8 +143,8 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 format_msg(Severity, Pid, Fmt, Args, State) ->
     (get_report(State))#syslog_report{
-      severity  = get_severity(Severity),
-      facility  = get_facility(Severity, State),
+      severity  = map_severity(Severity),
+      facility  = severity_to_facility(Severity, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format(Fmt, Args)}.
@@ -159,22 +157,22 @@ format_report(_, Pid, crash_report, Report, State) ->
     Event = {calendar:now_to_local_time(Timestamp),
              {error_report, self(), {Pid, crash_report, Report}}},
     (get_report(State))#syslog_report{
-      severity  = get_severity(critical),
-      facility  = get_facility(critical, State),
+      severity  = map_severity(critical),
+      facility  = severity_to_facility(critical, State),
       timestamp = Timestamp,
       pid       = get_pid(Pid),
       msg       = lists:flatten(sasl_report:format_report(fd, all, Event))};
 format_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
     (get_report(State))#syslog_report{
-      severity  = get_severity(informational),
-      facility  = get_facility(informational, State),
+      severity  = map_severity(informational),
+      facility  = severity_to_facility(informational, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format("started application ~w on node ~w", [A, N])};
 format_report(_, Pid, _, [{application, A}, {exited, R} | _], State) ->
     (get_report(State))#syslog_report{
-      severity  = get_severity(error),
-      facility  = get_facility(error, State),
+      severity  = map_severity(error),
+      facility  = severity_to_facility(error, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format("application ~w exited with ~512p", [A, R])};
@@ -183,8 +181,8 @@ format_report(_, Pid, progress, Report, State) ->
     Child = get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
     (get_report(State))#syslog_report{
-      severity  = get_severity(informational),
-      facility  = get_facility(informational, State),
+      severity  = map_severity(informational),
+      facility  = severity_to_facility(informational, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format("started child ~s using ~512p", [Child, Mfargs])};
@@ -193,22 +191,22 @@ format_report(_, Pid, supervisor_report, Report, State) ->
     Event = {calendar:now_to_local_time(Timestamp),
              {error_report, self(), {Pid, supervisor_report, Report}}},
     (get_report(State))#syslog_report{
-      severity  = get_severity(error),
-      facility  = get_facility(error, State),
+      severity  = map_severity(error),
+      facility  = severity_to_facility(error, State),
       timestamp = Timestamp,
       pid       = get_pid(Pid),
       msg       = lists:flatten(sasl_report:format_report(fd, all, Event))};
 format_report(_, Pid, syslog, [{args, A}, {fmt, F}, {severity, S} | _], State) ->
     (get_report(State))#syslog_report{
-      severity  = get_severity(S),
-      facility  = get_facility(S, State),
+      severity  = map_severity(S),
+      facility  = severity_to_facility(S, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format(F, A)};
 format_report(Severity, Pid, _Type, Report, State) ->
     (get_report(State))#syslog_report{
-      severity  = get_severity(Severity),
-      facility  = get_facility(Severity, State),
+      severity  = map_severity(Severity),
+      facility  = severity_to_facility(Severity, State),
       timestamp = os:timestamp(),
       pid       = get_pid(Pid),
       msg       = format(Report)}.
@@ -282,20 +280,22 @@ get_appname(Node)            -> hd(string:tokens(Node, "@")).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_module(rfc5424) -> syslog_rfc5424;
-get_module(rfc3164) -> syslog_rfc3164.
+get_property(Property, Default) -> get_property_(?GET_ENV(Property), Default).
+get_property_({ok, Value}, _)   -> Value;
+get_property_(_, Value)         -> Value.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_port(auto, _)                       -> 514;
-get_port(Port, _) when is_integer(Port) -> Port.
+get_protocol(rfc5424) -> syslog_rfc5424;
+get_protocol(rfc3164) -> syslog_rfc3164.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_bom(false) -> <<>>;
-get_bom(true)  -> unicode:encoding_to_bom(utf8).
+get_bom()           -> get_bom(?GET_ENV(use_rfc5424_bom)).
+get_bom({ok, true}) -> unicode:encoding_to_bom(utf8);
+get_bom(_)          -> <<>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -308,9 +308,9 @@ get_pid(_, P)                    -> pid_to_list(P).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_facility(error,    #state{error_facility = F}) -> map_facility(F);
-get_facility(critical, #state{error_facility = F}) -> map_facility(F);
-get_facility(_,        #state{facility = F})       -> map_facility(F).
+severity_to_facility(error,    #state{error_facility = F}) -> map_facility(F);
+severity_to_facility(critical, #state{error_facility = F}) -> map_facility(F);
+severity_to_facility(_,        #state{facility = F})       -> map_facility(F).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -343,14 +343,14 @@ map_facility(local7)   -> 23.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_severity(emergency)     -> 0;
-get_severity(alert)         -> 1;
-get_severity(critical)      -> 2;
-get_severity(error)         -> 3;
-get_severity(warning)       -> 4;
-get_severity(notice)        -> 5;
-get_severity(informational) -> 6;
-get_severity(debug)         -> 7.
+map_severity(emergency)     -> 0;
+map_severity(alert)         -> 1;
+map_severity(critical)      -> 2;
+map_severity(error)         -> 3;
+map_severity(warning)       -> 4;
+map_severity(notice)        -> 5;
+map_severity(informational) -> 6;
+map_severity(debug)         -> 7.
 
 %%%=============================================================================
 %%% TESTS

@@ -43,8 +43,8 @@ application environment:
 * `{dest_host, inet:ip_address() | inet:hostname()}`
   Specifies the host to which Syslog packets will be sent. Default is
   `{127, 0, 0, 1}`.
-* `{dest_port, auto | inet:port_number()}`
-  Specifies the port to which Syslog packets will be sent. Default is `auto`.
+* `{dest_port, inet:port_number()}`
+  Specifies the port to which Syslog packets will be sent. Default is `514`.
 * `{facility, facility()}`
   Specifies the facility Syslog packets will be sent with. Default is `daemon`.
 * `{error_facility, facility()}`
