@@ -11,11 +11,5 @@
    {mod, {syslog, []}},
    {env,
     [
-     {enabled,         true},
-     {protocol,        rfc3164},
-     {dest_host,       {127,0,0,1}},
-     {dest_port,       auto},
-     {facility,        daemon},
-     {error_facility,  daemon},
-     {use_rfc5424_bom, false}
+     {enabled, true}
     ]}]}.
