@@ -1,7 +1,7 @@
 syslog
 ======
 
-A Syslog based logger for error_logger reports. This project is strongly
+A Syslog based logger for `error_logger` reports. This project is strongly
 inspired by the [sasl_syslog](http://github.com/travelping/sasl_syslog) project
 Which in fact delivers quite similar functionality.
 
@@ -17,12 +17,14 @@ reports.
 Features
 --------
 
-* Write standard error_logger messages/reports using the Syslog protocol without
+* Write standard `error_logger` messages/reports using the Syslog protocol without
   the need of drivers, ports or NIFs.
-* Send messages according to RFC 3164 (BSD Syslog) or RFC 5424.
+* Send messages according to RFC 3164 (BSD Syslog) or RFC 5424 (Syslog Protocol).
 * Robust event handler by using a supervised event handler subscription.
 * Optionally write messages with severity `critical` or `error` into a separate
   facility.
+* No load on the `application_controller` ETS table (do not query the application
+  environment when constructing a message).
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
 
 Configuration
