@@ -92,3 +92,23 @@ month(9)  -> "Sep";
 month(10) -> "Oct";
 month(11) -> "Nov";
 month(12) -> "Dec".
+
+%%%=============================================================================
+%%% Tests
+%%%=============================================================================
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+rfc3164_date_test() ->
+    R = #syslog_report{timestamp = {1365,283256,908235}},
+    ?assertEqual("Apr  6 21:20:56", lists:flatten(rfc3164_date(R))).
+
+rfc3164_hostname_test() ->
+    R1 = #syslog_report{hostname = "host.domain.com", domain = "domain.com"},
+    ?assertEqual("host", rfc3164_hostname(R1)),
+    R2 = #syslog_report{hostname = "host", domain = ""},
+    ?assertEqual("host", rfc3164_hostname(R2)).
+
+-endif.

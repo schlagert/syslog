@@ -75,3 +75,26 @@ rfc5424_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
 %%------------------------------------------------------------------------------
 truncate(L, S) when length(S) =< L -> S;
 truncate(L, S)                     -> string:substr(S, 1, L).
+
+%%%=============================================================================
+%%% Tests
+%%%=============================================================================
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+rfc5424_date_test() ->
+    R = #syslog_report{timestamp = {1365,283256,908235}},
+    ?assertEqual("2013-04-06T21:20:56.908235Z", lists:flatten(rfc5424_date(R))).
+
+truncate_test() ->
+    ?assertEqual("",    truncate(0, "")),
+    ?assertEqual("",    truncate(1, "")),
+    ?assertEqual("",    truncate(0, "123")),
+    ?assertEqual("1",   truncate(1, "123")),
+    ?assertEqual("12",  truncate(2, "123")),
+    ?assertEqual("123", truncate(3, "123")),
+    ?assertEqual("123", truncate(4, "123")).
+
+-endif.

@@ -17,15 +17,23 @@ reports.
 Features
 --------
 
-* Write standard `error_logger` messages/reports using the Syslog protocol without
-  the need of drivers, ports or NIFs.
+* Write standard `error_logger` messages/reports using the Syslog protocol
+  without the need of drivers, ports or NIFs.
 * Send messages according to RFC 3164 (BSD Syslog) or RFC 5424 (Syslog Protocol).
 * Robust event handler by using a supervised event handler subscription.
 * Optionally write messages with severity `critical` or `error` into a separate
   facility.
-* No load on the `application_controller` ETS table (do not query the application
-  environment when constructing a message).
+* No load on the `application_controller` ETS table (do not query the
+  application environment when constructing a message).
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
+
+Planned
+-------
+
+* Configurable maximum packet size.
+* Configurable short/verbose printing format for progress reports.
+* Utilize the RFC 5424 _STRUCTURED-DATA_ field for `info_report`,
+  `warning_report` or `error_report` with `proplists`. 
 
 Configuration
 -------------
@@ -45,8 +53,8 @@ application environment:
 
 * `{use_rfc5424_bom, boolean()}`
 
-  Specifies whether the RFC5424 protocol backend should include the UTF-8 BOM in
-  the message part of a Syslog packet. Default is `false'.
+  Specifies whether the RFC5424 protocol backend should include the UTF-8 BOM
+  in the message part of a Syslog packet. Default is `false'.
 
 * `{dest_host, inet:ip_address() | inet:hostname()}`
 
@@ -84,8 +92,8 @@ The `syslog` application will log everything logged with the standard
 functions `syslog:log/2` and `syslog:log/3` to log messages directly with a
 specific severity.
 
-In some cases users may only want to include the application into their
-release without enabling it by default. This can be achieved by disabling the
+In some cases users may only want to include the application into their release
+without enabling it by default. This can be achieved by disabling the
 application in the release's `sys.config` file as followed:
 ```erlang
 {syslog, [{enabled, false}]}
