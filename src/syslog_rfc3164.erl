@@ -39,9 +39,9 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $<,
      integer_to_list((F bsl 3) + S),
      $>,
-     rfc3164_date(Report),
+     get_date(Report),
      $\s,
-     rfc3164_hostname(Report),
+     get_hostname(Report),
      $\s,
      Report#syslog_report.appname,
      $[,
@@ -62,19 +62,19 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-rfc3164_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
-    rfc3164_date(calendar:now_to_universal_time({MegaSecs, Secs, MicroSecs}));
-rfc3164_date({{_, Mo, D}, {H, Mi, S}}) ->
+get_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
+    get_date(calendar:now_to_local_time({MegaSecs, Secs, MicroSecs}));
+get_date({{_, Mo, D}, {H, Mi, S}}) ->
     io_lib:format("~s ~2.. b ~2..0b:~2..0b:~2..0b", [month(Mo), D, H, Mi, S]).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-rfc3164_hostname(#syslog_report{hostname = H, domain = D}) ->
-    rfc3164_hostname(H, string:rstr(H, [$. | D])).
-rfc3164_hostname(Hostname, Occurence) when Occurence > 2 ->
+get_hostname(#syslog_report{hostname = H, domain = D}) ->
+    get_hostname(H, string:rstr(H, [$. | D])).
+get_hostname(Hostname, Occurence) when Occurence > 2 ->
     string:sub_string(Hostname, 1, Occurence - 1);
-rfc3164_hostname(Hostname, _) ->
+get_hostname(Hostname, _) ->
     Hostname.
 
 %%------------------------------------------------------------------------------
@@ -101,14 +101,28 @@ month(12) -> "Dec".
 
 -include_lib("eunit/include/eunit.hrl").
 
-rfc3164_date_test() ->
+get_date_test() ->
     R = #syslog_report{timestamp = {1365,283256,908235}},
-    ?assertEqual("Apr  6 21:20:56", lists:flatten(rfc3164_date(R))).
+    ?assertEqual("Apr  6 23:20:56", lists:flatten(get_date(R))).
 
-rfc3164_hostname_test() ->
+get_hostname_test() ->
     R1 = #syslog_report{hostname = "host.domain.com", domain = "domain.com"},
-    ?assertEqual("host", rfc3164_hostname(R1)),
+    ?assertEqual("host", get_hostname(R1)),
     R2 = #syslog_report{hostname = "host", domain = ""},
-    ?assertEqual("host", rfc3164_hostname(R2)).
+    ?assertEqual("host", get_hostname(R2)).
+
+to_iolist_test() ->
+    R = #syslog_report{severity = 5,
+		       facility = 20,
+		       timestamp = {1365,283256,908235},
+		       hostname = "host.domain.com",
+		       domain = "domain.com",
+		       appname = "beam",
+		       beam_pid = "12345",
+		       pid = "init",
+		       msg = "info goes here"},
+    ?assertEqual(
+       "<165>Apr  6 23:20:56 host beam[12345] init - info goes here",
+       binary_to_list(iolist_to_binary(to_iolist(R)))).
 
 -endif.
