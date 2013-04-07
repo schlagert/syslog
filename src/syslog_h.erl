@@ -376,4 +376,9 @@ get_appname_test() ->
     ?assertEqual("nodename", get_appname("nodename@hostname")),
     ?assertEqual("nodename", get_appname("nodename@hostname.dom.ain")).
 
+get_pid_test() ->
+    ?assertEqual("init", get_pid(init)),
+    ?assertEqual("init", get_pid(whereis(init))),
+    ?assertEqual(pid_to_list(self()), get_pid(self())).
+
 -endif. %% TEST

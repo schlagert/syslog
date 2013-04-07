@@ -24,6 +24,8 @@
 
 -include("syslog.hrl").
 
+-define(VERSION, $1).
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -39,9 +41,9 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $<,
      integer_to_list((F bsl 3) + S),
      $>,
-     $1,
+     ?VERSION,
      $\s,
-     rfc5424_date(Report),
+     get_date(Report),
      $\s,
      truncate(255, Report#syslog_report.hostname),
      $\s,
@@ -64,9 +66,9 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-rfc5424_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
-    rfc5424_date(calendar:now_to_universal_time({MegaSecs, Secs, 0}), MicroSecs).
-rfc5424_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
+get_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
+    get_date(calendar:now_to_universal_time({MegaSecs, Secs, 0}), MicroSecs).
+get_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
     io_lib:format("~4..0b-~2..0b-~2..0bT~2..0b:~2..0b:~2..0b.~6..0bZ",
                   [Y, Mo, D, H, Mi, S, Micro]).
 
@@ -84,9 +86,9 @@ truncate(L, S)                     -> string:substr(S, 1, L).
 
 -include_lib("eunit/include/eunit.hrl").
 
-rfc5424_date_test() ->
+get_date_test() ->
     R = #syslog_report{timestamp = {1365,283256,908235}},
-    ?assertEqual("2013-04-06T21:20:56.908235Z", lists:flatten(rfc5424_date(R))).
+    ?assertEqual("2013-04-06T21:20:56.908235Z", lists:flatten(get_date(R))).
 
 truncate_test() ->
     ?assertEqual("",    truncate(0, "")),
