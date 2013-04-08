@@ -19,63 +19,85 @@
 -include("syslog.hrl").
 
 -define(TEST_PORT, 31337).
+-define(TIMEOUT,   100).
 
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
 
-rfc3164_test() ->
-    {ok, Socket} = setup(rfc3164),
-
-    %% empty the mailbox
-    receive _ -> ok after 100 -> ok end,
-
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+rfc3164_enabled_test() ->
+    {ok, Socket} = setup(rfc3164, true),
 
     Pid = pid_to_list(self()),
     Month = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
     Date = Month ++ " (\\s|\\d)\\d \\d\\d:\\d\\d:\\d\\d",
 
+    ?assertEqual(ok, syslog:log(notice,   "hello world")),
     Re1 = "<29>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    Msg1 = binary_to_list(assertReceive(Socket)),
-    ?assertMatch({match, _}, re:run(Msg1, Re1)),
+    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
+    ?assertEqual(ok, syslog:log(critical, "hello world")),
     Re2 = "<26>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    Msg2 = binary_to_list(assertReceive(Socket)),
-    ?assertMatch({match, _}, re:run(Msg2, Re2)),
+    ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
+    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
     Re3 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    Msg3 = binary_to_list(assertReceive(Socket)),
-    ?assertMatch({match, _}, re:run(Msg3, Re3)),
+    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     teardown(Socket).
 
-rfc5424_test() ->
-    {ok, Socket} = setup(rfc5424),
-
-    %% empty the mailbox
-    receive _ -> ok after 100 -> ok end,
-
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+rfc5424_enabled_test() ->
+    {ok, Socket} = setup(rfc5424, true),
 
     Pid = pid_to_list(self()),
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
 
+    ?assertEqual(ok, syslog:log(notice,   "hello world")),
     Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    Msg1 = binary_to_list(assertReceive(Socket)),
-    ?assertMatch({match, _}, re:run(Msg1, Re1)),
+    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
+    ?assertEqual(ok, syslog:log(critical, "hello world")),
     Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    Msg2 = binary_to_list(assertReceive(Socket)),
-    ?assertMatch({match, _}, re:run(Msg2, Re2)),
+    ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
+    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
     Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    Msg3 = binary_to_list(assertReceive(Socket)),
-    ?assertMatch({match, _}, re:run(Msg3, Re3)),
+    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+
+    teardown(Socket).
+
+rfc5424_enable_disable_test() ->
+    {ok, Socket} = setup(rfc5424, false),
+
+    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    assert_socket_empty(Socket),
+
+    ?assertEqual(ok, syslog:enable()),
+    empty_mailbox(),
+
+    Pid = pid_to_list(self()),
+    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
+
+    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
+
+    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re2)),
+
+    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+
+    ?assertEqual(ok, syslog:disable()),
+
+    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    assert_socket_empty(Socket),
 
     teardown(Socket).
 
@@ -83,14 +105,15 @@ rfc5424_test() ->
 %%% internal functions
 %%%=============================================================================
 
-setup(Protocol) ->
+setup(Protocol, Enabled) ->
     ?assertEqual(ok, application:start(sasl)),
     {ok, [AppSpec]} = file:consult(filename:join(["..", "ebin", "syslog.app"])),
     ?assertEqual(ok, load(AppSpec)),
-    ?assertEqual(ok, application:set_env(syslog, enabled, true)),
+    ?assertEqual(ok, application:set_env(syslog, enabled, Enabled)),
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
     ?assertEqual(ok, application:start(syslog)),
+    ?assertEqual(ok, empty_mailbox()),
     gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]).
 
 teardown(Socket) ->
@@ -102,4 +125,14 @@ load(App) -> load(App, application:load(App)).
 load(_, ok) -> ok;
 load(App, {error, {already_loaded, App}}) -> ok.
 
-assertReceive(Socket) -> receive {udp, Socket, _, _, Bin} -> Bin end.
+read(Socket) -> receive {udp, Socket, _, _, Bin} -> binary_to_list(Bin) end.
+
+empty_mailbox() -> receive _ -> empty_mailbox() after ?TIMEOUT -> ok end.
+
+assert_socket_empty(Socket) ->
+    receive
+        {udp, Socket, _, _, Bin} ->
+            throw({test_failed, {unexpected_message, binary_to_list(Bin)}})
+    after
+        ?TIMEOUT -> ok
+    end.
