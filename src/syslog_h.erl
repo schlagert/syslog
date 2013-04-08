@@ -67,34 +67,36 @@ attach(Socket) -> gen_event:add_sup_handler(error_logger, ?MODULE, [Socket]).
 %%%=============================================================================
 
 -record(state, {
-          socket         :: gen_udp:socket(),
-          protocol       :: module(),
-          facility       :: syslog:facility(),
-          error_facility :: syslog:facility(),
-          dest_host      :: inet:ip_address() | inet:hostname(),
-          dest_port      :: inet:port_number(),
-          hostname       :: string(),
-          domain         :: string(),
-          appname        :: string(),
-          beam_pid       :: string(),
-          bom            :: binary()}).
+          socket          :: gen_udp:socket(),
+          msg_queue_limit :: pos_integer(),
+          protocol        :: module(),
+          facility        :: syslog:facility(),
+          error_facility  :: syslog:facility(),
+          dest_host       :: inet:ip_address() | inet:hostname(),
+          dest_port       :: inet:port_number(),
+          hostname        :: string(),
+          domain          :: string(),
+          appname         :: string(),
+          beam_pid        :: string(),
+          bom             :: binary()}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 init([Socket]) ->
     {ok, #state{
-            socket         = Socket,
-            protocol       = get_protocol(get_property(protocol, ?PROTOCOL)),
-            facility       = get_property(facility, ?FACILITY),
-            error_facility = get_property(error_facility, ?FACILITY),
-            dest_host      = get_property(dest_host, ?DEST_HOST),
-            dest_port      = get_property(dest_port, ?DEST_PORT),
-            hostname       = get_hostname(),
-            domain         = get_domain(),
-            appname        = get_appname(),
-            beam_pid       = os:getpid(),
-            bom            = get_bom()}}.
+            socket          = Socket,
+            msg_queue_limit = get_property(msg_queue_limit, ?LIMIT),
+            protocol        = get_protocol(get_property(protocol, ?PROTOCOL)),
+            facility        = get_property(facility, ?FACILITY),
+            error_facility  = get_property(error_facility, ?FACILITY),
+            dest_host       = get_property(dest_host, ?DEST_HOST),
+            dest_port       = get_property(dest_port, ?DEST_PORT),
+            hostname        = get_hostname(),
+            domain          = get_domain(),
+            appname         = get_appname(),
+            beam_pid        = os:getpid(),
+            bom             = get_bom()}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -108,9 +110,19 @@ handle_event({warning_msg, _, {Pid, Fmt, Args}}, State) ->
 handle_event({warning_report, _, {Pid, Type, Report}}, State) ->
     {ok, send(format_report(warning, Pid, Type, Report, State), State)};
 handle_event({info_msg, _, {Pid, Fmt, Args}}, State) ->
-    {ok, send(format_msg(notice, Pid, Fmt, Args, State), State)};
+    case process_info(self(), message_queue_len) of
+        {message_queue_len, Items} when Items < State#state.msg_queue_limit ->
+            {ok, send(format_msg(notice, Pid, Fmt, Args, State), State)};
+        _ ->
+            {ok, State}
+    end;
 handle_event({info_report, _, {Pid, Type, Report}}, State) ->
-    {ok, send(format_report(notice, Pid, Type, Report, State), State)};
+    case process_info(self(), message_queue_len) of
+        {message_queue_len, Items} when Items < State#state.msg_queue_limit ->
+            {ok, send(format_report(notice, Pid, Type, Report, State), State)};
+        _ ->
+            {ok, State}
+    end;
 handle_event(_, State) ->
     {ok, State}.
 

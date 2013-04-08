@@ -33,7 +33,7 @@ Planned
 * Configurable maximum packet size.
 * Configurable short/verbose printing format for progress reports.
 * Utilize the RFC 5424 _STRUCTURED-DATA_ field for `info_report`,
-  `warning_report` or `error_report` with `proplists`. 
+  `warning_report` or `error_report` with `proplists`.
 
 Configuration
 -------------
@@ -45,6 +45,14 @@ application environment:
 
   Indicating whether Syslog reporting should be started when the `syslog`
   application gets started. Default is `true`.
+
+* `{msg_queue_limit, pos_integer()}`
+
+  Specifies the number of entries in the `error_logger` message queue to which
+  `info_msg` and `info_report` events are processed. If the message queue size
+  does exceed this limit, informational messages will be _dropped_ by the
+  `syslog` application until the message queue recovers. However, error and
+  warning messages/reports will always be processed. Default is `1000`.
 
 * `{protocol, rfc3164 | rfc5424}`
 
