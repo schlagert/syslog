@@ -35,17 +35,45 @@ rfc3164_test() ->
     ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
 
     Pid = pid_to_list(self()),
-    Date = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec).+",
+    Month = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
+    Date = Month ++ " (\\s|\\d)\\d \\d\\d:\\d\\d:\\d\\d",
 
-    Re1 = "<29>" ++ Date ++ "\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re1 = "<29>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     Msg1 = binary_to_list(assertReceive(Socket)),
     ?assertMatch({match, _}, re:run(Msg1, Re1)),
 
-    Re2 = "<26>" ++ Date ++ "\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re2 = "<26>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     Msg2 = binary_to_list(assertReceive(Socket)),
     ?assertMatch({match, _}, re:run(Msg2, Re2)),
 
-    Re3 = "<27>" ++ Date ++ "\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re3 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Msg3 = binary_to_list(assertReceive(Socket)),
+    ?assertMatch({match, _}, re:run(Msg3, Re3)),
+
+    teardown(Socket).
+
+rfc5424_test() ->
+    {ok, Socket} = setup(rfc5424),
+
+    %% empty the mailbox
+    receive _ -> ok after 100 -> ok end,
+
+    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+
+    Pid = pid_to_list(self()),
+    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
+
+    Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    Msg1 = binary_to_list(assertReceive(Socket)),
+    ?assertMatch({match, _}, re:run(Msg1, Re1)),
+
+    Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    Msg2 = binary_to_list(assertReceive(Socket)),
+    ?assertMatch({match, _}, re:run(Msg2, Re2)),
+
+    Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     Msg3 = binary_to_list(assertReceive(Socket)),
     ?assertMatch({match, _}, re:run(Msg3, Re3)),
 
