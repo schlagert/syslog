@@ -229,16 +229,7 @@ send_datagram(Data, #state{socket = S, dest_host = H, dest_port = P}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-format(Fmt, Args) ->
-    try lists:flatten(io_lib:format(Fmt, Args)) of
-        Msg -> Msg
-    catch
-        Class:Exception ->
-            lists:flatten(
-              io_lib:format(
-                "io_lib:format(~256p, ~256p) crashed: ~16p:~256p",
-                [Fmt, Args, Class, Exception]))
-    end.
+format(Fmt, Args) -> lists:flatten(io_lib:format(Fmt, Args)).
 
 %%------------------------------------------------------------------------------
 %% @private
