@@ -52,7 +52,7 @@ application environment:
   `info_msg` and `info_report` events are processed. If the message queue size
   does exceed this limit, informational messages will be _dropped_ by the
   `syslog` application until the message queue recovers. However, error and
-  warning messages/reports will always be processed. Default is `1000`.
+  warning messages/reports will always be processed. Default is `10000`.
 
 * `{protocol, rfc3164 | rfc5424}`
 
