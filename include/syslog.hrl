@@ -39,6 +39,6 @@
 -define(PROTOCOL,  rfc3164).
 -define(DEST_HOST, {127, 0, 0, 1}).
 -define(DEST_PORT, 514).
--define(LIMIT,     10000).
+-define(LIMIT,     infinity).
 
 -endif. %% syslog_hrl_

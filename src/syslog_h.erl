@@ -68,7 +68,7 @@ attach(Socket) -> gen_event:add_sup_handler(error_logger, ?MODULE, [Socket]).
 
 -record(state, {
           socket          :: gen_udp:socket(),
-          msg_queue_limit :: pos_integer(),
+          msg_queue_limit :: pos_integer() | infinity,
           protocol        :: module(),
           facility        :: syslog:facility(),
           error_facility  :: syslog:facility(),
@@ -109,6 +109,9 @@ handle_event({warning_msg, _, {Pid, Fmt, Args}}, State) ->
     {ok, send(format_msg(warning, Pid, Fmt, Args, State), State)};
 handle_event({warning_report, _, {Pid, Type, Report}}, State) ->
     {ok, send(format_report(warning, Pid, Type, Report, State), State)};
+handle_event({info_msg, _, {Pid, Fmt, Args}}, State)
+  when State#state.msg_queue_limit =:= infinity ->
+    {ok, send(format_msg(notice, Pid, Fmt, Args, State), State)};
 handle_event({info_msg, _, {Pid, Fmt, Args}}, State) ->
     case process_info(self(), message_queue_len) of
         {message_queue_len, Items} when Items < State#state.msg_queue_limit ->
@@ -116,6 +119,9 @@ handle_event({info_msg, _, {Pid, Fmt, Args}}, State) ->
         _ ->
             {ok, State}
     end;
+handle_event({info_report, _, {Pid, Type, Report}}, State)
+  when State#state.msg_queue_limit =:= infinity ->
+    {ok, send(format_report(notice, Pid, Type, Report, State), State)};
 handle_event({info_report, _, {Pid, Type, Report}}, State) ->
     case process_info(self(), message_queue_len) of
         {message_queue_len, Items} when Items < State#state.msg_queue_limit ->

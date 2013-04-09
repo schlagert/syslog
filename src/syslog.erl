@@ -44,7 +44,7 @@
 -type severity() :: emergency | alert | critical | error |  warning | notice |
                     informational | debug.
 
--type option() :: {msg_queue_limit, pos_integer()} |
+-type option() :: {msg_queue_limit, pos_integer() | infinity} |
                   {protocol, rfc3164 | rfc5424} |
                   {dest_host, inet:ip_address() | inet:hostname()} |
                   {dest_port, inet:port_number()} |
