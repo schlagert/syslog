@@ -50,7 +50,7 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $\s,
      Report#syslog_report.pid,
      $\s,
-     $\-,
+     $-,
      $\s,
      Report#syslog_report.msg
     ].
