@@ -12,10 +12,10 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% The event handler for to be attached to the `error_logger' event manager.
-%%% This module will handle all log message, format them and forward them to the
-%%% configured protocol handler. Protocol handler must implement the `syslog_h'
-%%% behaviour.
+%%% The event handler to be attached to the `error_logger' event manager.
+%%% This module will handle all log messages, format them and forward them to
+%%% the% configured protocol handler. Protocol handlers must implement the
+%%% {@link syslog} behaviour.
 %%% @end
 %%%=============================================================================
 -module(syslog_h).
@@ -36,16 +36,6 @@
 -include("syslog.hrl").
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
-
-%%%=============================================================================
-%%% callback definitions
-%%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% This is the behaviour that must be implemented by protocol backends.
-%%------------------------------------------------------------------------------
-
--callback to_iolist(#syslog_report{}) -> iolist().
 
 %%%=============================================================================
 %%% API

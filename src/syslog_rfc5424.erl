@@ -17,7 +17,7 @@
 %%%=============================================================================
 -module(syslog_rfc5424).
 
--behaviour(syslog_h).
+-behaviour(syslog).
 
 %% API
 -export([to_iolist/1]).

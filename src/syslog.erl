@@ -15,6 +15,9 @@
 %%% Main module of the `syslog' application. This module contains functions to
 %%% enable or disable logging via syslog as well as two convinience functions
 %%% to log messages with a certain severity.
+%%%
+%%% This module also defines the behaviour that must be implemented by protocol
+%%% backends.
 %%% @end
 %%%=============================================================================
 -module(syslog).
@@ -53,6 +56,16 @@
                   {use_rfc5424_bom, boolean()}.
 
 -export_type([facility/0, severity/0, option/0]).
+
+%%%=============================================================================
+%%% callback definitions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% This is the behaviour that must be implemented by protocol backends.
+%%------------------------------------------------------------------------------
+
+-callback to_iolist(#syslog_report{}) -> iolist().
 
 %%%=============================================================================
 %%% API

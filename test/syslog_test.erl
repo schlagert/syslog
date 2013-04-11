@@ -107,7 +107,8 @@ rfc5424_enable_disable_test() ->
 
 setup(Protocol, Enabled) ->
     ?assertEqual(ok, application:start(sasl)),
-    {ok, [AppSpec]} = file:consult(filename:join(["..", "ebin", "syslog.app"])),
+    AppFile = filename:join(["..", "src", "syslog.app.src"]),
+    {ok, [AppSpec]} = file:consult(AppFile),
     ?assertEqual(ok, load(AppSpec)),
     ?assertEqual(ok, application:set_env(syslog, enabled, Enabled)),
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
