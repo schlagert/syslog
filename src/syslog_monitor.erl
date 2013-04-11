@@ -12,7 +12,7 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% A server keeping track of event handler registration. It will attach/detach
+%%% A server keeping track of event handler registrations. It will attach/detach
 %%% the {@link syslog_h} event handler to the `error_logger' as necessary (e.g.
 %%% if the handler gets detached accidentially on error) providing it with the
 %%% needed UDP socket.
@@ -82,12 +82,15 @@ handle_cast(_Request, State) -> {noreply, State}.
 %% @private
 %%------------------------------------------------------------------------------
 handle_info({gen_event_EXIT, syslog_h, shutdown}, State) ->
-    {stop, normal, State}; %% error_logger was shutdown properly
+    %% error_logger was shutdown properly, we can also RIP
+    {stop, normal, State};
 handle_info({gen_event_EXIT, syslog_h, _}, State) ->
-    ok = syslog_h:attach(State#state.socket), %% try to re-add the event handler
+    %% accidential unregistration, try to re-subscribe the event handler
+    ok = syslog_h:attach(State#state.socket),
     {noreply, State};
 handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
-    {stop, udp_closed, State#state{socket = undefined}}; %% get restarted
+    %% the socket, closed unexpectedly, die and resurrect
+    {stop, udp_closed, State#state{socket = undefined}};
 handle_info(_Info, State) ->
     {noreply, State}.
 
