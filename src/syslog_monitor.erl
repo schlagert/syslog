@@ -53,7 +53,7 @@
 %% @doc
 %% Start a monitor server which in turn will attach the {@link syslog_error_h}
 %% and {@link syslog_logger_h} at the appropriate event managers (`error_logger'
-%% and {@link syslog_logger}).
+%% and `syslog_logger'.
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, term()}.
