@@ -14,10 +14,13 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% A server keeping track of event handler registrations. It will attach/detach
-%%% the {@link syslog_h} event handler to the `error_logger' as necessary (e.g.
-%%% if the handler gets detached accidentially on error) providing it with the
-%%% needed UDP socket.
+%%% A server responsible for event handler registrations. The server will attach
+%%% and re-attach event handlers at requested event managers monitoring their
+%%% registration. This has the nice side-effect that as soon as this server gets
+%%% shutdown the registered event handlers will be removed automatically.
+%%%
+%%% @see syslog_error_h
+%%% @see syslog_logger_h
 %%% @end
 %%%=============================================================================
 -module(syslog_monitor).
@@ -35,7 +38,12 @@
          code_change/3,
          terminate/2]).
 
--include("syslog.hrl").
+-define(REGISTRATIONS,
+        [
+         %% Manager      Handler
+         {error_logger,  syslog_error_h},
+         {syslog_logger, syslog_logger_h}
+        ]).
 
 %%%=============================================================================
 %%% API
@@ -43,8 +51,9 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Starts the locally registered monitor server which in turn will attach the
-%% {@link syslog_h} event handler at the `error_logger' event manager.
+%% Start a monitor server which in turn will attach the {@link syslog_error_h}
+%% and {@link syslog_logger_h} at the appropriate event managers (`error_logger'
+%% and {@link syslog_logger}).
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, term()}.
@@ -54,21 +63,14 @@ start_link() -> gen_server:start_link(?MODULE, [], []).
 %%% gen_server callbacks
 %%%=============================================================================
 
--record(state, {socket :: gen_udp:socket()}).
+-record(state, {}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    process_flag(trap_exit, true),
-    {ok, Socket} = gen_udp:open(0, [binary, {reuseaddr, true}]),
-    case syslog_h:attach(Socket) of
-        ok ->
-            {ok, #state{socket = Socket}};
-        Error ->
-            ok = gen_udp:close(Socket),
-            {stop, Error}
-    end.
+    [ok = gen_event:add_sup_handler(M, H, []) || {M, H} <- ?REGISTRATIONS],
+    {ok, #state{}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -83,16 +85,13 @@ handle_cast(_Request, State) -> {noreply, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({gen_event_EXIT, syslog_h, shutdown}, State) ->
-    %% error_logger was shutdown properly, we can also RIP
+handle_info({gen_event_EXIT, {_EventHandler, _EventMgr}, shutdown}, State) ->
+    %% the respective event manager was shutdown properly, we can also RIP
     {stop, normal, State};
-handle_info({gen_event_EXIT, syslog_h, _}, State) ->
+handle_info({gen_event_EXIT, {EventHandler, EventMgr}, _}, State) ->
     %% accidential unregistration, try to re-subscribe the event handler
-    ok = syslog_h:attach(State#state.socket),
+    ok = gen_event:add_sup_handler(EventMgr, EventHandler, []),
     {noreply, State};
-handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
-    %% the socket, closed unexpectedly, die and resurrect
-    {stop, udp_closed, State#state{socket = undefined}};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -104,7 +103,4 @@ code_change(_OldVsn, State, _Extra) -> State.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Reason, #state{socket = undefined}) ->
-    ok;
-terminate(_Reason, #state{socket = Socket}) ->
-    gen_udp:close(Socket).
+terminate(_Reason, _State) -> ok.

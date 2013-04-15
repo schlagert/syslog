@@ -32,16 +32,19 @@ rfc3164_enabled_test() ->
     Month = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
     Date = Month ++ " (\\s|\\d)\\d \\d\\d:\\d\\d:\\d\\d",
 
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<29>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+
+    ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     teardown(Socket).
@@ -52,16 +55,19 @@ rfc5424_enabled_test() ->
     Pid = pid_to_list(self()),
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
 
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+
+    ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     teardown(Socket).
@@ -69,9 +75,9 @@ rfc5424_enabled_test() ->
 rfc5424_enable_disable_test() ->
     {ok, Socket} = setup(rfc5424, false),
 
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    ?assertEqual(ok, syslog:info_msg("hello world")),
+    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
+    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     assert_socket_empty(Socket),
 
     ?assertEqual(ok, syslog:enable()),
@@ -80,23 +86,23 @@ rfc5424_enable_disable_test() ->
     Pid = pid_to_list(self()),
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
 
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
+    ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
+    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     ?assertEqual(ok, syslog:disable()),
 
-    ?assertEqual(ok, syslog:log(notice,   "hello world")),
-    ?assertEqual(ok, syslog:log(critical, "hello world")),
-    ?assertEqual(ok, syslog:log(error,    "hello ~s", ["world"])),
+    ?assertEqual(ok, syslog:info_msg("hello world")),
+    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
+    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     assert_socket_empty(Socket),
 
     teardown(Socket).
@@ -120,6 +126,9 @@ setup(Protocol, Enabled) ->
 teardown(Socket) ->
     application:stop(syslog),
     application:stop(sasl),
+    application:unset_env(syslog, enabled),
+    application:unset_env(syslog, dest_port),
+    application:unset_env(syslog, protocol),
     gen_udp:close(Socket).
 
 load(App) -> load(App, application:load(App)).

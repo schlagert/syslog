@@ -1,15 +1,28 @@
 syslog
 ======
 
-A Syslog based logger for `error_logger` reports. This project is strongly
-inspired by the [sasl_syslog](http://github.com/travelping/sasl_syslog) project
-Which in fact delivers quite similar functionality.
+A Syslog based logging framework for erlang. This project is inspired by the
+two great work put in the two projects
+[sasl_syslog](http://github.com/travelping/sasl_syslog) and
+[lager](http://github.com/basho/lager). In fact `syslog` delivers quite
+similar functionality.
 
-The main differences between `sasl_syslog` and `syslog` are the RFC 3164
-(BSD Syslog) compliant protocol backend as well as some features that were
-borrowed from the [lager](http://github.com/basho/lager) project, e.g. having
-the possibility to log into separate files for `info` and `error` or `progress`
-reports.
+The main difference between `sasl_syslog` and `syslog` is that `sasl_syslog`
+does only provide logging of `error_logger` reports. However, the `error_logger`
+is known for its bad memory consumption behaviour under heavy load (due to its
+asynchronous logging mechanism). Additionally, `syslog` provides an optional
+RFC 3164 (BSD Syslog) compliant protocol backend which is the only standard
+supported by old versions of e.g. `syslog-ng` or `rsyslog`.
+
+On the other side, compared to `lager`, the `syslog` application has a very
+limited feature set. As its name infers `syslog` is specialized on delivering
+its messages using Syslog only, there are no file or console backends with
+custom-written and configurable log rotation or line formatting. However,
+`syslog` does not rely on port drivers or NIFs to implement the Syslog protocol
+and it includes several robustness features comparable to `lager`.
+
+In a nutshell `syslog` can be seen as a lightweight logging framework using
+available Syslog daemons/servers.
 
 * [Code](http://github.com/schlagert/syslog)
 * [EDoc](http://schlagert.github.com/syslog)
@@ -17,21 +30,19 @@ reports.
 Features
 --------
 
-* Write standard `error_logger` messages/reports using the Syslog protocol
-  without the need of drivers, ports or NIFs.
-* Send messages according to RFC 3164 (BSD Syslog) or RFC 5424 (Syslog Protocol).
-* Robust event handler by using a supervised event handler subscription.
-* Optionally write messages with severity `critical` or `error` into a separate
-  facility.
-* No load on the `application_controller` ETS table (do not query the
-  application environment when constructing a message).
+* Log messages and standard `error_logger` reports according to RFC 3164
+  (BSD Syslog) or RFC 5424 (Syslog Protocol) without the need of drivers, ports
+  or NIFs.
+* Robust event handlers by using a supervised event handler subscription.
+* Optionally separate error messages using a separate facility.
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
+* Configurable verbosity of SASL printing format (printing depth is also
+  configurable).
 
 Planned
 -------
 
 * Configurable maximum packet size.
-* Configurable short/verbose printing format for progress reports.
 * Utilize the RFC 5424 _STRUCTURED-DATA_ field for `info_report`,
   `warning_report` or `error_report` with `proplists`.
 
@@ -44,15 +55,15 @@ application environment:
 * `{enabled, boolean()}`
 
   Indicating whether Syslog reporting should be started when the `syslog`
-  application gets started. Default is `true`.
+  application gets started. Default is `true`. Otherwise the Syslog reporting
+  must explicitly be enabled using `syslog:enable/0`.
 
-* `{msg_queue_limit, pos_integer() | infinity}`
+* `{msg_queue_limit, Limit :: pos_integer() | infinity}`
 
   Specifies the number of entries in the `error_logger` message queue to which
-  `info_msg` and `info_report` events are processed. If the message queue size
-  does exceed this limit, informational messages will be _dropped_ by the
-  `syslog` application until the message queue recovers. However, error and
-  warning messages/reports will always be processed. Default is `infinity`.
+  events are processed. If the message queue size exceeds this limit messages
+  `syslog` will _drop_ the amount of events exceeding the limit. Default is
+  `infinity`.
 
 * `{protocol, rfc3164 | rfc5424}`
 
@@ -79,8 +90,17 @@ application environment:
 
 * `{error_facility, facility()}`
 
-  Specifies the facility Syslog packets with severity `error` or `critical` will
-  be sent with. Default is `daemon`.
+  Specifies the facility Syslog packets with severity `error`, `critical`,
+  `alert` or `emergency` will be sent with. Default is `daemon`.
+
+* `{verbose, true | {false, Depth :: pos_integer()}}`
+
+  Configures which pretty printing mode will be used when formatting
+  `error_logger` reports (e.g. progress reports, not format messages). If
+  verbose is `true` the `~p` format character will be used when formatting
+  terms. This will likely result in many multiline strings. If set to
+  `{false, Depth}` the `~P` format character will be used along with the
+  specified printing depth.
 
 The `syslog` application will not touch the standard SASL report handlers
 attached to the `error_logger` when SASL starts. However, having SASL progress
@@ -96,9 +116,10 @@ API
 ---
 
 The `syslog` application will log everything logged with the standard
-`error_logger` API. However, for convenience, `syslog` provides the two API
-functions `syslog:log/2` and `syslog:log/3` to log messages directly with a
-specific severity.
+`error_logger` API. However, this should not be used for ordinary logging.
+This should be done via the API functions provided by the `syslog` module
+which provides functions similar to the ones provided by the `error_logger`
+module (see the `*msg/1,2` functions).
 
 In some cases users may only want to include the application into their release
 without enabling it by default. This can be achieved by disabling the

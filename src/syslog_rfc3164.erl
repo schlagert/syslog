@@ -19,7 +19,7 @@
 %%%=============================================================================
 -module(syslog_rfc3164).
 
--behaviour(syslog).
+-behaviour(syslog_logger_h).
 
 %% API
 -export([to_iolist/1]).

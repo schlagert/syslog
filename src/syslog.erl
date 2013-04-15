@@ -16,11 +16,11 @@
 %%%
 %%% @doc
 %%% Main module of the `syslog' application. This module contains functions to
-%%% enable or disable logging via syslog as well as two convinience functions
-%%% to log messages with a certain severity.
+%%% enable or disable logging via syslog as well as functions to send messages
+%%% directly bypassing the `error_logger'.
 %%%
-%%% This module also defines the behaviour that must be implemented by protocol
-%%% backends.
+%%% The logging functions have the same name than the `error_logger' functions
+%%% making switching from one to another easy.
 %%% @end
 %%%=============================================================================
 -module(syslog).
@@ -29,7 +29,16 @@
 -behaviour(supervisor).
 
 %% API
--export([enable/0, disable/0, log/2, log/3]).
+-export([info_msg/1,
+         info_msg/2,
+         warning_msg/1,
+         warning_msg/2,
+         error_msg/1,
+         error_msg/2,
+         enable/0,
+         disable/0,
+         msg/3,
+         msg/4]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -37,38 +46,24 @@
 %% supervisor callbacks
 -export([init/1]).
 
--include("syslog.hrl").
-
--define(CHILD, syslog_monitor).
--define(SPEC, {?CHILD, {?CHILD, start_link, []}, transient, 1000, worker, [?CHILD]}).
-
 -type facility() :: kern | kernel | user | mail | daemon | auth | syslog | lpr |
                     news | uucp | cron | authpriv | ftp | ntp | audit | alert |
                     clock | local0 | local1 | local2 | local3 | local4 |
                     local5 | local6 | local7.
 
--type severity() :: emergency | alert | critical | error |  warning | notice |
+-type severity() :: emergency | alert | critical | error | warning | notice |
                     informational | debug.
 
--type option() :: {msg_queue_limit, pos_integer() | infinity} |
-                  {protocol, rfc3164 | rfc5424} |
-                  {dest_host, inet:ip_address() | inet:hostname()} |
+-type option() :: {dest_host, inet:ip_address() | inet:hostname()} |
                   {dest_port, inet:port_number()} |
-                  {facility, facility()} |
                   {error_facility, facility()} |
-                  {use_rfc5424_bom, boolean()}.
+                  {facility, facility()} |
+                  {msg_queue_limit, Limit :: pos_integer() | infinity} |
+                  {protocol, rfc3164 | rfc5424} |
+                  {use_rfc5424_bom, boolean()} |
+                  {verbose, true | {false, Depth :: pos_integer()}}.
 
 -export_type([facility/0, severity/0, option/0]).
-
-%%%=============================================================================
-%%% callback definitions
-%%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% This is the behaviour that must be implemented by protocol backends.
-%%------------------------------------------------------------------------------
-
--callback to_iolist(#syslog_report{}) -> iolist().
 
 %%%=============================================================================
 %%% API
@@ -76,45 +71,93 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Enable SASL report logging via `syslog'. This will also disable the standard
+%% Sends a message with severity `notice'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec info_msg(string()) -> ok.
+info_msg(Msg) -> info_msg(Msg, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a format message with severity `notice'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec info_msg(string(), [term()]) -> ok.
+info_msg(Fmt, Args) -> msg(notice, Fmt, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a message with severity `warning'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec warning_msg(string()) -> ok.
+warning_msg(Msg) -> warning_msg(Msg, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a format message with severity `warning'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec warning_msg(string(), [term()]) -> ok.
+warning_msg(Fmt, Args) -> msg(warning, Fmt, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a message with severity `error'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec error_msg(string()) -> ok.
+error_msg(Msg) -> error_msg(Msg, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a format message with severity `error'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec error_msg(string(), [term()]) -> ok.
+error_msg(Fmt, Args) -> msg(error, Fmt, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Enable logging via `syslog'. This will also disable the standard
 %% `error_logger' TTY output, if successful.
 %% @end
 %%------------------------------------------------------------------------------
 -spec enable() -> ok.
 enable() ->
-    supervisor:delete_child(?MODULE, ?CHILD),
-    {ok, _} = supervisor:start_child(?MODULE, ?SPEC),
+    supervisor:delete_child(?MODULE, syslog_monitor),
+    {ok, _} = supervisor:start_child(?MODULE, server(syslog_monitor)),
     error_logger:tty(false).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Disable SASL report logging via `syslog'. This will also re-enable the
-%% standard `error_logger' TTY output, if successful.
+%% Disable logging via `syslog'. This will also re-enable the standard
+%% `error_logger' TTY output, if successful.
 %% @end
 %%------------------------------------------------------------------------------
 -spec disable() -> ok.
 disable() ->
-    ok = supervisor:terminate_child(?MODULE, ?CHILD),
-    supervisor:delete_child(?MODULE, ?CHILD),
+    ok = supervisor:terminate_child(?MODULE, syslog_monitor),
+    supervisor:delete_child(?MODULE, syslog_monitor),
     error_logger:tty(true).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Log a message with a specific severity.
+%% Logs a format message with a specific severity.
 %% @end
 %%------------------------------------------------------------------------------
--spec log(severity(), string()) -> ok.
-log(Severity, Msg) -> log(Severity, Msg, []).
+-spec msg(severity(), string(), [term()]) -> ok.
+msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Log a format message with a specific severity.
+%% Logs a format message with a specific severity from a specific process.
 %% @end
 %%------------------------------------------------------------------------------
--spec log(severity(), string(), [term()]) -> ok.
-log(Severity, Fmt, Args) ->
-    Report = [{args, Args}, {fmt, Fmt}, {severity, Severity}],
-    error_logger:info_report(syslog, Report).
+-spec msg(severity(), pid(), string(), [term()]) -> ok.
+msg(Severity, Pid, Fmt, Args) ->
+    Msg = lists:flatten(io_lib:format(Fmt, Args)),
+    gen_event:sync_notify(syslog_logger, {log, Severity, Pid, Msg}).
 
 %%%=============================================================================
 %%% Application callbacks
@@ -125,8 +168,7 @@ log(Severity, Fmt, Args) ->
 %%------------------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
     Result = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
-    Enabled = application:get_env(?MODULE, enabled),
-    maybe_enable(Result, Enabled).
+    maybe_enable(Result, syslog_lib:get_property(enabled, true)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -140,7 +182,7 @@ stop(_State) -> ok.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([]) -> {ok, {{one_for_one, 5, 10}, []}}.
+init([]) -> {ok, {{one_for_one, 5, 10}, [event_mgr(syslog_logger)]}}.
 
 %%%=============================================================================
 %%% internal functions
@@ -149,5 +191,20 @@ init([]) -> {ok, {{one_for_one, 5, 10}, []}}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_enable(Result = {ok, _}, {ok, true}) -> ok = enable(), Result;
-maybe_enable(Result, _)                    -> Result.
+maybe_enable(Result = {ok, _}, true) -> ok = enable(), Result;
+maybe_enable(Result, _)              -> Result.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+server(M) -> spec(M, {M, start_link, []}, [M]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+event_mgr(M) -> spec(M, {gen_event, start_link, [{local, M}]}, dynamic).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+spec(M, S, Ms) -> {M, S, transient, brutal_kill, worker, Ms}.

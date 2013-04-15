@@ -1,11 +1,11 @@
 {application, syslog,
   [{description, "A Syslog based logger for error_logger reports."},
    {id, "com.github.schlagert"},
-   {vsn, "0.0.9"},
+   {vsn, "0.9.0"},
    {registered,
     [
      syslog,
-     syslog_monitor
+     syslog_logger
     ]},
    {applications, [kernel, stdlib, sasl]},
    {mod, {syslog, []}},

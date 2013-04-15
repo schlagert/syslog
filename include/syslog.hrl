@@ -43,5 +43,6 @@
 -define(DEST_HOST, {127, 0, 0, 1}).
 -define(DEST_PORT, 514).
 -define(LIMIT,     infinity).
+-define(VERBOSITY, true).
 
 -endif. %% syslog_hrl_

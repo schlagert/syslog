@@ -1,0 +1,170 @@
+%%%=============================================================================
+%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%%
+%%% Permission to use, copy, modify, and/or distribute this software for any
+%%% purpose with or without fee is hereby granted, provided that the above
+%%% copyright notice and this permission notice appear in all copies.
+%%%
+%%% THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+%%% WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+%%% MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+%%% ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+%%% WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+%%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+%%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+%%%
+%%% @doc
+%%% The event handler to be attached to the `error_logger' event manager.
+%%% The received messages will be formatted and forwarded to the
+%%% {@link syslog_logger} event manager.
+%%%
+%%% @see syslog_monitor
+%%% @end
+%%%=============================================================================
+-module(syslog_error_h).
+
+-behaviour(gen_event).
+
+%% gen_event callbacks
+-export([init/1,
+         handle_event/2,
+         handle_call/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
+
+-include("syslog.hrl").
+
+%%%=============================================================================
+%%% gen_event callbacks
+%%%=============================================================================
+
+-record(state, {
+          msgs_to_drop = 0    :: non_neg_integer(),
+          dropped = {0, 0, 0} :: {integer(), integer(), integer()},
+          verbosity           :: true | {false, pos_integer()},
+          msg_queue_limit     :: pos_integer() | infinity}).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+init(_Arg) ->
+    {ok, #state{
+            verbosity       = syslog_lib:get_property(verbose, ?VERBOSITY),
+            msg_queue_limit = syslog_lib:get_property(msg_queue_limit, ?LIMIT)}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_event(Event, State = #state{msg_queue_limit = infinity}) ->
+    {ok, handle_msg(Event, State)};
+handle_event(Event, State = #state{msgs_to_drop = ToDrop}) when ToDrop > 0 ->
+    {ok, drop_msg(Event, State#state{msgs_to_drop = ToDrop - 1})};
+handle_event(Event, State = #state{msg_queue_limit = Limit}) ->
+    {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
+    case QueueLen - Limit of
+        Len when Len =< 0 ->
+            {ok, handle_msg(Event, State)};
+        Len ->
+            {ok, drop_msg(Event, State#state{msgs_to_drop = Len})}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_call(_Request, State) -> {ok, undef, State}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_info(_Info, State) -> {ok, State}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+terminate(_Arg, _State) -> ok.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+
+%%%=============================================================================
+%%% internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+drop_msg(Msg, State = #state{msgs_to_drop = 0, dropped = Dropped}) ->
+    {E, W, I} = drop_msg_(Msg, Dropped),
+    Fmt = "dropped ~p errors, ~p warnings, ~p notices",
+    log_msg(error, self(), Fmt, [E, W, I], State#state{dropped = {0, 0, 0}});
+drop_msg(Msg, State = #state{dropped = Dropped}) ->
+    State#state{dropped = drop_msg_(Msg, Dropped)}.
+drop_msg_({error, _, _}         , {E, W, I}) -> {E + 1, W, I};
+drop_msg_({error_report, _, _}  , {E, W, I}) -> {E + 1, W, I};
+drop_msg_({warning_msg, _, _}   , {E, W, I}) -> {E, W + 1, I};
+drop_msg_({warning_report, _, _}, {E, W, I}) -> {E, W + 1, I};
+drop_msg_({info_msg, _, _}      , {E, W, I}) -> {E, W, I + 1};
+drop_msg_({info_report, _, _}   , {E, W, I}) -> {E, W, I + 1};
+drop_msg_(_                     , {E, W, I}) -> {E, W, I}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_msg({error, _, {Pid, Fmt, Args}}, State) ->
+    log_msg(error, Pid, Fmt, Args, State);
+handle_msg({error_report, _, {Pid, Type, Report}}, State) ->
+    log_report(error, Pid, Type, Report, State);
+handle_msg({warning_msg, _, {Pid, Fmt, Args}}, State) ->
+    log_msg(warning, Pid, Fmt, Args, State);
+handle_msg({warning_report, _, {Pid, Type, Report}}, State) ->
+    log_report(warning, Pid, Type, Report, State);
+handle_msg({info_msg, _, {Pid, Fmt, Args}}, State) ->
+    log_msg(notice, Pid, Fmt, Args, State);
+handle_msg({info_report, _, {Pid, Type, Report}}, State) ->
+    log_report(notice, Pid, Type, Report, State);
+handle_msg(_, State) ->
+    State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+log_msg(Severity, Pid, Fmt, Args, State) ->
+    syslog:msg(Severity, Pid, Fmt, Args),
+    State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+log_report(_, Pid, crash_report, Report, State) ->
+    Time = calendar:now_to_local_time(os:timestamp()),
+    Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
+    Msg = lists:flatten(sasl_report:format_report(fd, all, Event)),
+    log_msg(critical, Pid, Msg, [], State);
+log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
+    log_msg(informational, Pid, "started application ~w on node ~w", [A, N], State);
+log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbosity = true}) ->
+    log_msg(error, Pid, "application ~w exited with ~p", [A, R], State);
+log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbosity = {false, D}}) ->
+    log_msg(error, Pid, "application ~w exited with ~P", [A, R, D], State);
+log_report(_, Pid, progress, Report, State = #state{verbosity = true}) ->
+    Details = proplists:get_value(started, Report, []),
+    Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
+    Mfargs = proplists:get_value(mfargs, Details),
+    log_msg(informational, Pid, "started child ~s with ~p", [Child, Mfargs], State);
+log_report(_, Pid, progress, Report, State = #state{verbosity = {false, D}}) ->
+    Details = proplists:get_value(started, Report, []),
+    Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
+    Mfargs = proplists:get_value(mfargs, Details),
+    log_msg(informational, Pid, "started child ~s with ~P", [Child, Mfargs, D], State);
+log_report(_, Pid, supervisor_report, Report, State) ->
+    Time = calendar:now_to_local_time(os:timestamp()),
+    Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
+    Msg = lists:flatten(sasl_report:format_report(fd, all, Event)),
+    log_msg(error, Pid, Msg, [], State);
+log_report(Severity, Pid, _, Report, State = #state{verbosity = true}) ->
+    log_msg(Severity, Pid, "~p", [Report], State);
+log_report(Severity, Pid, _, Report, State = #state{verbosity = {false, D}}) ->
+    log_msg(Severity, Pid, "~P", [Report, D], State).
