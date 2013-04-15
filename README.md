@@ -78,11 +78,11 @@ application environment:
 
   Specifies the port to which Syslog packets will be sent. Default is `514`.
 
-* `{facility, facility()}`
+* `{facility, syslog:facility()}`
 
   Specifies the facility Syslog packets will be sent with. Default is `daemon`.
 
-* `{error_facility, facility()}`
+* `{error_facility, syslog:facility()}`
 
   Specifies the facility Syslog packets with severity `error`, `critical`,
   `alert` or `emergency` will be sent with. Default is `daemon`.
