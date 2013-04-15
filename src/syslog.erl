@@ -148,10 +148,12 @@ msg(Severity, Pid, Fmt, Args) ->
 %% @private
 %%------------------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
-    case supervisor:start_link({local, ?MODULE}, ?MODULE, []) of
+    ok = error_logger:tty(false),
+    case supervisor:start_link(?MODULE, []) of
         {ok, Pid} ->
-            {ok = error_logger:tty(false), Pid};
+            {ok, Pid};
         Error ->
+	    ok = error_logger:tty(true),
             Error
     end.
 
