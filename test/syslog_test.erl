@@ -25,8 +25,8 @@
 %%% TESTS
 %%%=============================================================================
 
-rfc3164_enabled_test() ->
-    {ok, Socket} = setup(rfc3164, true),
+rfc3164_test() ->
+    {ok, Socket} = setup(rfc3164),
 
     Pid = pid_to_list(self()),
     Month = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
@@ -49,8 +49,8 @@ rfc3164_enabled_test() ->
 
     teardown(Socket).
 
-rfc5424_enabled_test() ->
-    {ok, Socket} = setup(rfc5424, true),
+rfc5424_test() ->
+    {ok, Socket} = setup(rfc5424),
 
     Pid = pid_to_list(self()),
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
@@ -72,51 +72,15 @@ rfc5424_enabled_test() ->
 
     teardown(Socket).
 
-rfc5424_enable_disable_test() ->
-    {ok, Socket} = setup(rfc5424, false),
-
-    ?assertEqual(ok, syslog:info_msg("hello world")),
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    assert_socket_empty(Socket),
-
-    ?assertEqual(ok, syslog:enable()),
-    empty_mailbox(),
-
-    Pid = pid_to_list(self()),
-    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
-
-    ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
-
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re2)),
-
-    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
-
-    ?assertEqual(ok, syslog:disable()),
-
-    ?assertEqual(ok, syslog:info_msg("hello world")),
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    assert_socket_empty(Socket),
-
-    teardown(Socket).
-
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
 
-setup(Protocol, Enabled) ->
+setup(Protocol) ->
     ?assertEqual(ok, application:start(sasl)),
     AppFile = filename:join(["..", "src", "syslog.app.src"]),
     {ok, [AppSpec]} = file:consult(AppFile),
     ?assertEqual(ok, load(AppSpec)),
-    ?assertEqual(ok, application:set_env(syslog, enabled, Enabled)),
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
     ?assertEqual(ok, application:start(syslog)),
@@ -126,7 +90,6 @@ setup(Protocol, Enabled) ->
 teardown(Socket) ->
     application:stop(syslog),
     application:stop(sasl),
-    application:unset_env(syslog, enabled),
     application:unset_env(syslog, dest_port),
     application:unset_env(syslog, protocol),
     gen_udp:close(Socket).
@@ -138,11 +101,3 @@ load(App, {error, {already_loaded, App}}) -> ok.
 read(Socket) -> receive {udp, Socket, _, _, Bin} -> binary_to_list(Bin) end.
 
 empty_mailbox() -> receive _ -> empty_mailbox() after ?TIMEOUT -> ok end.
-
-assert_socket_empty(Socket) ->
-    receive
-        {udp, Socket, _, _, Bin} ->
-            throw({test_failed, {unexpected_message, binary_to_list(Bin)}})
-    after
-        ?TIMEOUT -> ok
-    end.

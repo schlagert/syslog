@@ -9,7 +9,4 @@
     ]},
    {applications, [kernel, stdlib, sasl]},
    {mod, {syslog, []}},
-   {env,
-    [
-     {enabled, true}
-    ]}]}.
+   {env, []}]}.

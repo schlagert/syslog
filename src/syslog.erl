@@ -16,8 +16,8 @@
 %%%
 %%% @doc
 %%% Main module of the `syslog' application. This module contains functions to
-%%% enable or disable logging via syslog as well as functions to send messages
-%%% directly bypassing the `error_logger'.
+%%% send messages directly over Syslog bypassing the `error_logger'. Like its
+%%% `error_logger' counterparts these functions never fail.
 %%%
 %%% The logging functions have the same name than the `error_logger' functions
 %%% making switching from one to another easy.
@@ -35,8 +35,6 @@
          warning_msg/2,
          error_msg/1,
          error_msg/2,
-         enable/0,
-         disable/0,
          msg/3,
          msg/4]).
 
@@ -64,6 +62,8 @@
                   {verbose, true | {false, Depth :: pos_integer()}}.
 
 -export_type([facility/0, severity/0, option/0]).
+
+-include("syslog.hrl").
 
 %%%=============================================================================
 %%% API
@@ -119,30 +119,6 @@ error_msg(Fmt, Args) -> msg(error, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Enable logging via `syslog'. This will also disable the standard
-%% `error_logger' TTY output, if successful.
-%% @end
-%%------------------------------------------------------------------------------
--spec enable() -> ok.
-enable() ->
-    supervisor:delete_child(?MODULE, syslog_monitor),
-    {ok, _} = supervisor:start_child(?MODULE, server(syslog_monitor)),
-    error_logger:tty(false).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Disable logging via `syslog'. This will also re-enable the standard
-%% `error_logger' TTY output, if successful.
-%% @end
-%%------------------------------------------------------------------------------
--spec disable() -> ok.
-disable() ->
-    ok = supervisor:terminate_child(?MODULE, syslog_monitor),
-    supervisor:delete_child(?MODULE, syslog_monitor),
-    error_logger:tty(true).
-
-%%------------------------------------------------------------------------------
-%% @doc
 %% Logs a format message with a specific severity.
 %% @end
 %%------------------------------------------------------------------------------
@@ -151,13 +127,18 @@ msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Logs a format message with a specific severity from a specific process.
+%% Logs a format message with a specific severity from a specific process. This
+%% function never fails.
 %% @end
 %%------------------------------------------------------------------------------
 -spec msg(severity(), pid(), string(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
-    Msg = lists:flatten(io_lib:format(Fmt, Args)),
-    gen_event:sync_notify(syslog_logger, {log, Severity, Pid, Msg}).
+    try
+        Msg = lists:flatten(io_lib:format(Fmt, Args)),
+        gen_event:sync_notify(syslog_logger, {log, Severity, Pid, Msg})
+    catch
+        C:E -> ?ERR("syslog failed to deliver message due to ~p:~p", [C, E])
+    end.
 
 %%%=============================================================================
 %%% Application callbacks
@@ -167,8 +148,12 @@ msg(Severity, Pid, Fmt, Args) ->
 %% @private
 %%------------------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
-    Result = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
-    maybe_enable(Result, syslog_lib:get_property(enabled, true)).
+    case supervisor:start_link({local, ?MODULE}, ?MODULE, []) of
+        {ok, Pid} ->
+            {ok = error_logger:tty(false), Pid};
+        Error ->
+            Error
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -182,17 +167,13 @@ stop(_State) -> ok.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([]) -> {ok, {{one_for_one, 5, 10}, [event_mgr(syslog_logger)]}}.
+init([]) ->
+    Specs = [event_mgr(syslog_logger), server(syslog_monitor)],
+    {ok, {{one_for_one, 5, 10}, Specs}}.
 
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-maybe_enable(Result = {ok, _}, true) -> ok = enable(), Result;
-maybe_enable(Result, _)              -> Result.
 
 %%------------------------------------------------------------------------------
 %% @private

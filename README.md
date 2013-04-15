@@ -52,12 +52,6 @@ Configuration
 The following configuration options are available and can be configured in the
 application environment:
 
-* `{enabled, boolean()}`
-
-  Indicating whether Syslog reporting should be started when the `syslog`
-  application gets started. Default is `true`. Otherwise the Syslog reporting
-  must explicitly be enabled using `syslog:enable/0`.
-
 * `{msg_queue_limit, Limit :: pos_integer() | infinity}`
 
   Specifies the number of entries in the `error_logger` message queue to which
@@ -102,6 +96,14 @@ application environment:
   `{false, Depth}` the `~P` format character will be used along with the
   specified printing depth.
 
+The `syslog` application will disable the standard `error_logger` TTY output on
+application startup. This has nothing to do with the standard SASL logging. It
+only disables non-SASL logging via, e.g. `error_logger:info_msg/1,2`. This
+standard logging can be re-enabled at any time using the following:
+```erlang
+error_logger:tty(true).
+```
+
 The `syslog` application will not touch the standard SASL report handlers
 attached to the `error_logger` when SASL starts. However, having SASL progress
 reports on TTY can be quite annoying when trying to use the shell. The correct
@@ -120,13 +122,3 @@ The `syslog` application will log everything logged with the standard
 This should be done via the API functions provided by the `syslog` module
 which provides functions similar to the ones provided by the `error_logger`
 module (see the `*msg/1,2` functions).
-
-In some cases users may only want to include the application into their release
-without enabling it by default. This can be achieved by disabling the
-application in the release's `sys.config` file as followed:
-```erlang
-{syslog, [{enabled, false}]}
-```
-
-Syslog logging can then be switched on and off using the `syslog:enable/0`
-and `syslog:disable/0` API functions.
