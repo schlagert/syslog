@@ -137,7 +137,7 @@ msg(Severity, Pid, Fmt, Args) ->
         Msg = lists:flatten(io_lib:format(Fmt, Args)),
         gen_event:sync_notify(syslog_logger, {log, Severity, Pid, Msg})
     catch
-        C:E -> ?ERR("syslog failed to deliver message due to ~p:~p", [C, E])
+        C:E -> ?ERR("syslog failed to deliver message due to ~p:~p~n", [C, E])
     end.
 
 %%%=============================================================================
