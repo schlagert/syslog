@@ -122,3 +122,11 @@ The `syslog` application will log everything logged with the standard
 This should be done via the API functions provided by the `syslog` module
 which provides functions similar to the ones provided by the `error_logger`
 module (see the `*msg/1,2` functions).
+
+Supervision
+-----------
+
+<img src="http://schlagert.github.com/syslog/syslog.svg" alt="syslog supervision"/>
+
+For curiosity, the above illustration shows the very simple supervision
+hierarchy used by the `syslog` application.

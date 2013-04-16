@@ -20,7 +20,7 @@ perl -pi.bak -e "s/\`\`\`/\'\'\'/g" README.md
 perl -pi -e "s/\'\'\'erlang/\`\`\`/g" README.md
 
 # create overview.edoc
-echo "@title syslog - An RFC3164 and RF5424 compliant logger for 'error_logger' reports." > doc/overview.edoc
+echo "@title syslog - An RFC3164 and RF5424 compliant logging framework for Erlang." > doc/overview.edoc
 echo "" >> doc/overview.edoc
 sed -r -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
 
@@ -30,15 +30,13 @@ mv README.md.bak README.md
 # create edoc and cleanup
 rebar clean compile doc
 rm -rf tmp
+cp -f syslog.svg doc/
 
 # deploy to gh-pages
 if [ "$1" == "deploy" ]; then
     CURRENT=`git branch | grep "*" | awk '{print $2}'`
     git checkout gh-pages
-    rm *.html
-    rm edoc-info
-    rm erlang.png
-    rm stylesheet.css
+    rm -f *.html edoc-info erlang.png stylesheet.css syslog.svg
     cp doc/* .
     git add .
     git commit -a -m "Regenerated site documentation."
