@@ -1,7 +1,7 @@
-ebin
 .eunit
 deps
 doc
+*.app
 *.o
 *.beam
 *.plt
