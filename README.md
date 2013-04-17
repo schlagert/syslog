@@ -49,8 +49,10 @@ Planned
 Configuration
 -------------
 
-The following configuration options are available and can be configured in the
-application environment:
+The `syslog` application already comes with sensible defaults (except for
+example the used facilites and the destination host). However, many things can
+be cusomized if desired. For this purpose the following configuration options
+are available and can be configured in the application environment:
 
 * `{msg_queue_limit, Limit :: pos_integer() | infinity}`
 
@@ -94,7 +96,13 @@ application environment:
   verbose is `true` the `~p` format character will be used when formatting
   terms. This will likely result in many multiline strings. If set to
   `{false, Depth}` the `~P` format character will be used along with the
-  specified printing depth.
+  specified printing depth. Default is `true`.
+
+* `{no_progress, boolean()}`
+
+  This flag can be used to completely omit progress reports from the logging
+  output. So if you you don't care when a new process gets started set this to
+  `true`. Default is `false`.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It

@@ -29,7 +29,9 @@
 -behaviour(supervisor).
 
 %% API
--export([info_msg/1,
+-export([debug_msg/1,
+         debug_msg/2,
+         info_msg/1,
          info_msg/2,
          warning_msg/1,
          warning_msg/2,
@@ -59,7 +61,8 @@
                   {msg_queue_limit, Limit :: pos_integer() | infinity} |
                   {protocol, rfc3164 | rfc5424} |
                   {use_rfc5424_bom, boolean()} |
-                  {verbose, true | {false, Depth :: pos_integer()}}.
+                  {verbose, true | {false, Depth :: pos_integer()}} |
+                  {no_progress, boolean()}.
 
 -export_type([facility/0, severity/0, option/0]).
 
@@ -68,6 +71,22 @@
 %%%=============================================================================
 %%% API
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a message with severity `debug'. This function never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec debug_msg(string()) -> ok.
+debug_msg(Msg) -> debug_msg(Msg, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a format message with severity `notice'. This function never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec debug_msg(string(), [term()]) -> ok.
+debug_msg(Fmt, Args) -> msg(debug, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

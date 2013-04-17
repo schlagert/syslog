@@ -44,11 +44,12 @@
 %%% Defines for default values.
 %%%=============================================================================
 
--define(FACILITY,  daemon).
--define(PROTOCOL,  rfc3164).
--define(DEST_HOST, {127, 0, 0, 1}).
--define(DEST_PORT, 514).
--define(LIMIT,     infinity).
--define(VERBOSITY, true).
+-define(FACILITY,    daemon).
+-define(PROTOCOL,    rfc3164).
+-define(DEST_HOST,   {127, 0, 0, 1}).
+-define(DEST_PORT,   514).
+-define(LIMIT,       infinity).
+-define(VERBOSITY,   true).
+-define(NO_PROGRESS, false).
 
 -endif. %% syslog_hrl_
