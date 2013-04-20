@@ -5,3 +5,7 @@ doc
 *.o
 *.beam
 *.plt
+bench/lager
+bench/log4erl
+bench/sasl_syslog
+bench/syslog

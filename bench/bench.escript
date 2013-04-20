@@ -19,14 +19,34 @@
 %%%
 %%% @doc
 %%% A benchmarking escript to test different logging frameworks.
+%%%
+%%% The test spams messages from a configurable number of processes over a
+%%% configurable amount of time. The number of messages sent will be reported
+%%% as well as the total duration which includes the time needed to deliver all
+%%% messages.
 %%% @end
 %%%=============================================================================
 
 -mode(compile).
 
 -define(TEST_PORT, 31337).
--define(FMT,       "a message ~p").
--define(ARGS,      ["containing a lengthy string message to print, not funny"]).
+-define(FMT, "~p").
+-define(ARGS,
+	[%% 910bytes of garbage
+	 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	 "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	 "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+	 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+	 "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+	 "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+	 "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"
+	 "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
+	 "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+	 "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll"
+	 "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+	 ]).
 
 -define(URL,
         [
@@ -106,13 +126,17 @@ run(Fun, NumProcs, Millis, Socket) ->
     ok = empty_socket(Socket),
     StartMillis = current_millis(),
     generate(Fun, NumProcs, Millis),
-    NumSent = finalize(Socket, NumProcs),
+    {NumSent, Memory} = finalize(Socket, NumProcs),
     StopMillis = current_millis(),
     io:format(
       "  Total messages sent: ~p~n"
       "  Messages per second: ~p~n"
-      "  Total duration:      ~pms~n",
-      [NumSent, NumSent * 1000 div Millis, StopMillis - StartMillis]).
+      "  Total duration:      ~pms~n"
+      "  Max. memory used :   ~pMB~n",
+      [NumSent,
+       NumSent * 1000 div Millis,
+       StopMillis - StartMillis,
+       Memory / (1024 * 1024)]).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -148,7 +172,7 @@ empty_socket(Socket) ->
             exit({error, udp_closed});
         {udp_closed, _} ->
             empty_socket(Socket)
-    after 20 ->
+    after 100 ->
             ok
     end.
 
@@ -180,22 +204,29 @@ generate_loop(Fun, EndMillis, NumMessages) ->
 %% @private
 %%------------------------------------------------------------------------------
 finalize(Socket, NumProcs) ->
-    finalize(Socket, NumProcs, 0, 0).
-finalize(_Socket, 0, NumSent, NumSent) ->
-    NumSent;
-finalize(Socket, Left, NumSent, NumReceived) ->
+    finalize(Socket, NumProcs, {0, 0}, 0, 0).
+finalize(_Socket, 0, {MaxMemory, _}, NumSent, NumSent) ->
+    {NumSent, MaxMemory};
+finalize(Socket, Left, Memory, NumSent, NumReceived) ->
+    NewMemory = memory_snapshot(Memory),
     receive
         {'DOWN', _, process, _, {ok, Sent}} ->
-            finalize(Socket, Left - 1, NumSent + Sent, NumReceived);
+            finalize(Socket, Left - 1, NewMemory, NumSent + Sent, NumReceived);
         {'DOWN', _, process, _, _} ->
-            finalize(Socket, Left - 1, NumSent, NumReceived);
+            finalize(Socket, Left - 1, NewMemory, NumSent, NumReceived);
         {udp, Socket, _, _, _} ->
-            finalize(Socket, Left, NumSent, NumReceived + 1);
+            finalize(Socket, Left, NewMemory, NumSent, NumReceived + 1);
         {udp_closed, Socket} ->
             exit({error, udp_closed});
         _ ->
-            finalize(Socket, Left, NumSent, NumReceived)
+            finalize(Socket, Left, NewMemory, NumSent, NumReceived)
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+memory_snapshot({Max, 0})       -> {erlang:max(erlang:memory(total), Max), 1};
+memory_snapshot({Max, Counter}) -> {Max, (Counter + 1) rem 100}.
 
 %%------------------------------------------------------------------------------
 %% @private
