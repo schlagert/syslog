@@ -23,7 +23,7 @@
 %%% The test spams messages from a configurable number of processes over a
 %%% configurable amount of time. The number of messages sent will be reported
 %%% as well as the total duration which includes the time needed to deliver all
-%%% messages.
+%%% messages and the maximum needed processes memory.
 %%% @end
 %%%=============================================================================
 
@@ -32,7 +32,7 @@
 -define(TEST_PORT, 31337).
 -define(FMT, "~p").
 -define(ARGS,
-	[%% 910bytes of garbage
+	[%% 840bytes of garbage
 	 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
@@ -45,13 +45,12 @@
 	 "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
 	 "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
 	 "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll"
-	 "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
 	 ]).
 
 -define(URL,
         [
          {"lager",       "https://github.com/basho/lager_syslog.git"},
-         {"log4erl",     "https://github.com/ahmednawras/log4erl.git"},
+         {"log4erl",     "https://github.com/schlagert/log4erl.git"},
          {"sasl_syslog", "https://github.com/travelping/sasl_syslog.git"},
          {"syslog",      "https://github.com/schlagert/syslog.git"}
         ]).
@@ -225,7 +224,7 @@ finalize(Socket, Left, Memory, NumSent, NumReceived) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-memory_snapshot({Max, 0})       -> {erlang:max(erlang:memory(total), Max), 1};
+memory_snapshot({Max, 0})       -> {erlang:max(erlang:memory(processes), Max), 1};
 memory_snapshot({Max, Counter}) -> {Max, (Counter + 1) rem 100}.
 
 %%------------------------------------------------------------------------------
