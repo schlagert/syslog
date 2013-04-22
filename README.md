@@ -134,7 +134,12 @@ module (see the `*msg/1,2` functions).
 Supervision
 -----------
 
-<img src="http://schlagert.github.com/syslog/syslog.svg" width="50%" alt="syslog supervision"/>
+<img
+ align="center"
+ width="70%"
+ alt="syslog supervision"
+ src="http://schlagert.github.com/syslog/syslog.svg"
+/>
 
 For curiosity, the above illustration shows the very simple supervision
 hierarchy used by the `syslog` application.
