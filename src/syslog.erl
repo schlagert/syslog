@@ -161,7 +161,7 @@ msg(Severity, Pid, Fmt, Args) ->
     try
         Msg = lists:flatten(io_lib:format(Fmt, Args)),
         try
-            gen_event:sync_notify(syslog_logger, {log, Severity, Pid, Msg})
+            syslog_logger:msg(Severity, Pid, Msg)
         catch
             _:_ -> ?ERR("~s~n", [Msg])
         end
@@ -209,14 +209,14 @@ init([]) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-server(M) -> spec(M, {M, start_link, []}, [M]).
+server(M) -> spec(M, [M]).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-event_mgr(M) -> spec(M, {gen_event, start_link, [{local, M}]}, dynamic).
+event_mgr(M) -> spec(M, dynamic).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-spec(M, S, Ms) -> {M, S, transient, brutal_kill, worker, Ms}.
+spec(M, Ms) -> {M, {M, start_link, []}, transient, brutal_kill, worker, Ms}.

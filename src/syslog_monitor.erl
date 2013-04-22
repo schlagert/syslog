@@ -19,8 +19,9 @@
 %%% registration. This has the nice side-effect that as soon as this server gets
 %%% shutdown the registered event handlers will be removed automatically.
 %%%
-%%% @see syslog_error_h
+%%% @see syslog_logger
 %%% @see syslog_logger_h
+%%% @see syslog_error_h
 %%% @end
 %%%=============================================================================
 -module(syslog_monitor).
@@ -42,6 +43,7 @@
         [
          %% Manager      Handler
          {error_logger,  syslog_error_h},
+         {syslog_logger, syslog_logger},
          {syslog_logger, syslog_logger_h}
         ]).
 
@@ -53,7 +55,7 @@
 %% @doc
 %% Start a monitor server which in turn will attach the {@link syslog_error_h}
 %% and {@link syslog_logger_h} at the appropriate event managers (`error_logger'
-%% and `syslog_logger'.
+%% and {@link syslog_logger}).
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, term()}.

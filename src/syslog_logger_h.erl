@@ -14,7 +14,7 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% The event handler to be attached to the `syslog_logger' event manager.
+%%% The event handler to be attached to the {@link syslog_logger} event manager.
 %%% This handler will convert the incoming messages to `syslog_report's which
 %%% will then be converted to Syslog packets using the configured protocol
 %%% backend and finally send the binaries over the wire.
