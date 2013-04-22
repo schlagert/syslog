@@ -59,7 +59,11 @@
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, term()}.
-start_link() -> gen_event:start_link({local, ?MODULE}).
+start_link() ->
+    %% table creation will throw when event manager gets restarted
+    catch ets:new(?MODULE, [named_table, {read_concurrency, true}]),
+    set_fun(sync_notify),
+    gen_event:start_link({local, ?MODULE}).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -68,23 +72,38 @@ start_link() -> gen_event:start_link({local, ?MODULE}).
 %%------------------------------------------------------------------------------
 -spec msg(syslog:severity(), pid(), string()) -> ok.
 msg(Severity, Pid, Msg) ->
-    gen_event:sync_notify(?MODULE, {log, Severity, Pid, Msg}).
+    gen_event:(get_fun())(?MODULE, {log, Severity, Pid, Msg}).
 
 %%%=============================================================================
 %%% gen_event callbacks
 %%%=============================================================================
 
--record(state, {}).
+-record(state, {
+          async = false :: boolean(),
+          async_limit   :: pos_integer()}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init(_Arg) -> {ok, #state{}}.
+init(_Arg) ->
+    AsyncLimit = syslog_lib:get_property(async_limit, ?ASYNC_LIMIT),
+    {ok, #state{async_limit = erlang:max(1, AsyncLimit)}}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event(_, State) -> {ok, State}.
+handle_event({log, _, _, _}, State = #state{async_limit = AsyncLimit}) ->
+    {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
+    case {QueueLen > AsyncLimit, State#state.async} of
+        {true, true} ->
+            {ok, set_fun(sync, State#state{async = false})};
+        {false, false} ->
+            {ok, set_fun(async, State#state{async = true})};
+        _ ->
+            {ok, State}
+    end;
+handle_event(_, State) ->
+    {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -109,3 +128,15 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_fun() -> ets:lookup_element(?MODULE, function, 2).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+set_fun(sync,  State) -> set_fun(sync_notify), State;
+set_fun(async, State) -> set_fun(notify), State.
+set_fun(Fun)          -> true = ets:insert(?MODULE, {function, Fun}).
