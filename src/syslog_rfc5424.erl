@@ -72,8 +72,33 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 get_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
     get_date(calendar:now_to_universal_time({MegaSecs, Secs, 0}), MicroSecs).
 get_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
-    io_lib:format("~4..0b-~2..0b-~2..0bT~2..0b:~2..0b:~2..0b.~6..0bZ",
-                  [Y, Mo, D, H, Mi, S, Micro]).
+    [integer_to_list(Y), "-", digit(Mo), "-", digit(D), "T",
+     digit(H), ":", digit(Mi), ":", digit(S), ".", micro(Micro), "Z"].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+digit(0)  -> "00";
+digit(1)  -> "01";
+digit(2)  -> "02";
+digit(3)  -> "03";
+digit(4)  -> "04";
+digit(5)  -> "05";
+digit(6)  -> "06";
+digit(7)  -> "07";
+digit(8)  -> "08";
+digit(9)  -> "09";
+digit(N)  -> integer_to_list(N).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+micro(M) when M < 10     -> ["00000", integer_to_list(M)];
+micro(M) when M < 100    -> ["0000", integer_to_list(M)];
+micro(M) when M < 1000   -> ["000", integer_to_list(M)];
+micro(M) when M < 10000  -> ["00", integer_to_list(M)];
+micro(M) when M < 100000 -> ["0", integer_to_list(M)];
+micro(M)                 -> integer_to_list(M).
 
 %%------------------------------------------------------------------------------
 %% @private
