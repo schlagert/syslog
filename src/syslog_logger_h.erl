@@ -137,10 +137,8 @@ get_report(Severity, Pid, Msg, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send(R = #syslog_report{msg = M}, State) ->
-    send([R#syslog_report{msg = L} || L <- string:tokens(M, "\n")], State);
-send(Rs, State = #state{protocol = Protocol}) when is_list(Rs) ->
-    [send_datagram(Protocol:to_iolist(R), State) || R <- Rs],
+send(Report, State = #state{protocol = Protocol}) ->
+    [send_datagram(Protocol:to_iolist(R), State) || R <- split(Report)],
     State.
 
 %%------------------------------------------------------------------------------
@@ -148,6 +146,18 @@ send(Rs, State = #state{protocol = Protocol}) when is_list(Rs) ->
 %%------------------------------------------------------------------------------
 send_datagram(Data, #state{socket = S, dest_host = H, dest_port = P}) ->
     ok = gen_udp:send(S, H, P, Data).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+split(R = #syslog_report{msg = Msg}) ->
+    [R#syslog_report{msg = Line} || Line <- split_impl(Msg), Line =/= <<>>].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+split_impl(Str) when is_list(Str)   -> split_impl(list_to_binary(Str));
+split_impl(Bin) when is_binary(Bin) -> binary:split(Bin, <<"\n">>, [global]).
 
 %%------------------------------------------------------------------------------
 %% @private

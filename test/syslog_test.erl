@@ -47,6 +47,12 @@ rfc3164_test() ->
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
+    ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
+    Re4 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello",
+    ?assertMatch({match, _}, re:run(read(Socket), Re4)),
+    Re5 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re5)),
+
     teardown(Socket).
 
 rfc5424_test() ->
@@ -69,6 +75,12 @@ rfc5424_test() ->
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+
+    ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
+    Re4 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello",
+    ?assertMatch({match, _}, re:run(read(Socket), Re4)),
+    Re5 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re5)),
 
     teardown(Socket).
 
