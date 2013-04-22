@@ -32,7 +32,7 @@
           beam_pid  :: string(),
           pid       :: string(),
           bom       :: binary(),
-          msg       :: string()}).
+          msg       :: string() | binary()}).
 
 %%%=============================================================================
 %%% Define for application internal error logging.
