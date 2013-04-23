@@ -126,7 +126,7 @@ get_report(Severity, Pid, Msg, State) ->
        severity  = map_severity(Severity),
        facility  = severity_to_facility(Severity, State),
        timestamp = os:timestamp(),
-       pid       = syslog_lib:get_pid(Pid),
+       pid       = Pid,
        hostname  = State#state.hostname,
        domain    = State#state.domain,
        appname   = State#state.appname,

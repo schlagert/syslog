@@ -144,8 +144,13 @@ start("syslog", _) ->
 run(App, Fun, NumProcs, Millis, Socket) ->
     ok = empty_socket(Socket),
     StartMillis = current_millis(),
+    %% eprof:start(),
+    %% profiling = eprof:start_profiling([error_logger, syslog_logger, syslog]),
     generate(Fun, NumProcs, Millis),
     {NumSent, Memory} = finalize(Socket, NumProcs),
+    %% eprof:stop_profiling(),
+    %% eprof:log("bench.prof"),
+    %% eprof:analyze(procs),
     report(App, NumSent, Memory, current_millis() - StartMillis).
 
 %%------------------------------------------------------------------------------
