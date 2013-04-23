@@ -146,7 +146,7 @@ Supervision
 
 <img src="http://schlagert.github.com/syslog/syslog.svg"
      alt="syslog supervision"
-     width="600px" />
+     style="margin-left: auto; margin-right: auto; width: 70%" />
 
 For curiosity, the above illustration shows the very simple supervision
 hierarchy used by the `syslog` application.
