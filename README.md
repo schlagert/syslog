@@ -71,7 +71,7 @@ are available and can be configured in the application environment:
 * `{use_rfc5424_bom, boolean()}`
 
   Specifies whether the RFC5424 protocol backend should include the UTF-8 BOM
-  in the message part of a Syslog packet. Default is `false'.
+  in the message part of a Syslog packet. Default is `false`.
 
 * `{dest_host, inet:ip_address() | inet:hostname()}`
 
@@ -112,7 +112,7 @@ are available and can be configured in the application environment:
   asynchronous logging is allowed. As long as the message queue does not exceed
   this limit every logging statement will by asynchronous. If the message queue
   length exceeds this limit all logging statements will be synchronous, blocking
-  the calling process until the logging request was processed.
+  the calling process until the logging request was processed. Default is `30`.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It

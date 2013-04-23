@@ -51,6 +51,6 @@
 -define(LIMIT,       infinity).
 -define(VERBOSITY,   true).
 -define(NO_PROGRESS, false).
--define(ASYNC_LIMIT, 20).
+-define(ASYNC_LIMIT, 30).
 
 -endif. %% syslog_hrl_
