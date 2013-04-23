@@ -88,8 +88,8 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, Severity, Pid, Msg}, State) ->
-    {ok, send(get_report(Severity, Pid, Msg, State), State)};
+handle_event({log, Timestamp, Severity, Pid, Msg}, State) ->
+    {ok, send(get_report(Timestamp, Severity, Pid, Msg, State), State)};
 handle_event(_, State) ->
     {ok, State}.
 
@@ -121,11 +121,11 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_report(Severity, Pid, Msg, State) ->
+get_report(Timestamp, Severity, Pid, Msg, State) ->
     #syslog_report{
        severity  = map_severity(Severity),
        facility  = severity_to_facility(Severity, State),
-       timestamp = os:timestamp(),
+       timestamp = Timestamp,
        pid       = Pid,
        hostname  = State#state.hostname,
        domain    = State#state.domain,

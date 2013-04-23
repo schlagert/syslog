@@ -71,8 +71,9 @@ start_link() ->
 %%------------------------------------------------------------------------------
 -spec msg(syslog:severity(), pid() | atom(), string()) -> ok.
 msg(Severity, Pid, Msg) ->
+    Fun = get_fun(),
     PidStr = syslog_lib:get_pid(Pid),
-    gen_event:(get_fun())(?MODULE, {log, Severity, PidStr, Msg}).
+    gen_event:Fun(?MODULE, {log, os:timestamp(), Severity, PidStr, Msg}).
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -92,7 +93,7 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, _, _, _}, State = #state{async_limit = AsyncLimit}) ->
+handle_event({log, _, _, _, _}, State = #state{async_limit = AsyncLimit}) ->
     {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
     case {QueueLen > AsyncLimit, State#state.async} of
         {true, true} ->
