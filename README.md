@@ -2,10 +2,12 @@ syslog
 ======
 
 A Syslog based logging framework for erlang. This project is inspired by the
-two great work put in the two projects
+great work put in the two projects
 [sasl_syslog](http://github.com/travelping/sasl_syslog) and
-[lager](http://github.com/basho/lager). In fact `syslog` delivers quite
-similar functionality.
+[lager](http://github.com/basho/lager). In fact `syslog` tries to combine both
+approaches. In a nutshell `syslog` can be seen as a lightweight version of the
+`lager` logging framework supporting only a fully compliant, Erlang-only Syslog
+backend allowing remote logging.
 
 The main difference between `sasl_syslog` and `syslog` is that `sasl_syslog`
 does only provide logging of `error_logger` reports. However, the `error_logger`
@@ -14,15 +16,13 @@ asynchronous logging mechanism). Additionally, `syslog` provides an optional
 RFC 3164 (BSD Syslog) compliant protocol backend which is the only standard
 supported by old versions of e.g. `syslog-ng` or `rsyslog`.
 
-On the other side, compared to `lager`, the `syslog` application has a very
-limited feature set. As its name infers `syslog` is specialized on delivering
-its messages using Syslog only, there are no file or console backends with
-custom-written and configurable log rotation or line formatting. However,
-`syslog` does not rely on port drivers or NIFs to implement the Syslog protocol
-and it includes several robustness features comparable to `lager`.
-
-In a nutshell `syslog` can be seen as a lightweight logging framework using
-available Syslog daemons/servers.
+Compared to `lager`, `syslog` has a very limited set of backends. As its name
+infers `syslog` is specialized on delivering its messages using Syslog only,
+there is no file or console backend, no custom-written and configurable log
+rotation, no line formatting and no tracing support. However, `syslog` does not
+rely on port drivers or NIFs to implement the Syslog protocol and it includes
+most of the beloved features known from `lager`, e.g. sync/async logging and
+supervised event handler registration.
 
 * [Code](http://github.com/schlagert/syslog)
 * [EDoc](http://schlagert.github.com/syslog)
@@ -38,6 +38,8 @@ Features
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
 * Configurable verbosity of SASL printing format (printing depth is also
   configurable).
+* Throughput optimization by dynamically switching from synchronous to
+  asynchronous mode.
 
 Planned
 -------
@@ -103,6 +105,14 @@ are available and can be configured in the application environment:
   This flag can be used to completely omit progress reports from the logging
   output. So if you you don't care when a new process gets started set this to
   `true`. Default is `false`.
+
+* `{async_limit, pos_integer()}`
+
+  Specified the number of entries in the `syslog_logger` message queue to which
+  asynchronous logging is allowed. As long as the message queue does not exceed
+  this limit every logging statement will by asynchronous. If the message queue
+  length exceeds this limit all logging statements will be synchronous, blocking
+  the calling process until the logging request was processed.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It
