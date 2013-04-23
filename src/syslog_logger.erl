@@ -61,8 +61,7 @@
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     %% table creation will throw when event manager gets restarted
-    catch ets:new(?MODULE, [named_table, {read_concurrency, true}]),
-    set_fun(sync_notify),
+    catch ets:new(?MODULE, [named_table, public, {read_concurrency, true}]),
     gen_event:start_link({local, ?MODULE}).
 
 %%------------------------------------------------------------------------------
@@ -79,7 +78,7 @@ msg(Severity, Pid, Msg) ->
 %%%=============================================================================
 
 -record(state, {
-          async = false :: boolean(),
+          async = true  :: boolean(),
           async_limit   :: pos_integer()}).
 
 %%------------------------------------------------------------------------------
@@ -87,7 +86,7 @@ msg(Severity, Pid, Msg) ->
 %%------------------------------------------------------------------------------
 init(_Arg) ->
     AsyncLimit = syslog_lib:get_property(async_limit, ?ASYNC_LIMIT),
-    {ok, #state{async_limit = erlang:max(1, AsyncLimit)}}.
+    {ok, set_fun(async, #state{async_limit = erlang:max(1, AsyncLimit)})}.
 
 %%------------------------------------------------------------------------------
 %% @private
