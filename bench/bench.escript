@@ -144,13 +144,15 @@ start("syslog", _) ->
 run(App, Fun, NumProcs, Millis, Socket) ->
     ok = empty_socket(Socket),
     StartMillis = current_millis(),
-    %% eprof:start(),
-    %% profiling = eprof:start_profiling([error_logger, syslog_logger, syslog]),
+%%    eprof:start(),
+%%    Ps = [lager_sup, lager_event, lager_crash_log, lager_handler_watcher_sup],
+%%    Ps = [syslog_logger, syslog],
+%%    profiling = eprof:start_profiling(Ps),
     generate(Fun, NumProcs, Millis),
     {NumSent, Memory} = finalize(Socket, NumProcs),
-    %% eprof:stop_profiling(),
-    %% eprof:log("bench.prof"),
-    %% eprof:analyze(procs),
+%%    eprof:stop_profiling(),
+%%    eprof:log("bench.prof"),
+%%    eprof:analyze(procs),
     report(App, NumSent, Memory, current_millis() - StartMillis).
 
 %%------------------------------------------------------------------------------
@@ -259,11 +261,10 @@ finalize(Socket, Left, Memory, NumSent, NumReceived) ->
             finalize(Socket, Left, NewMemory, NumSent, NumReceived + 1);
         {udp_closed, Socket} ->
             exit({error, udp_closed});
-        {io_request, From, ReplyAs, {put_chars, unicode, Msg}} ->
-            From ! {io_reply, ReplyAs, ok},
+        {io_request, F, A, {put_chars, unicode, M}} ->
             %% everyone else must do the socket IO, console loggers should
             %% at least fake this here
-            ok = gen_udp:send(Socket, "localhost", ?TEST_PORT, Msg),
+            F ! {io_reply, A, gen_udp:send(Socket, "localhost", ?TEST_PORT, M)},
             finalize(Socket, Left, NewMemory, NumSent, NumReceived);
         _ ->
             finalize(Socket, Left, NewMemory, NumSent, NumReceived)
