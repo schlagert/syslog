@@ -63,11 +63,29 @@ main([App]) ->
 main([App, NumberOfProcesses]) ->
     main([App, NumberOfProcesses, "2000"]);
 main(["all", NumberOfProcesses, MilliSeconds]) ->
-    main(["lager", NumberOfProcesses, MilliSeconds]),
-    main(["log4erl", NumberOfProcesses, MilliSeconds]),
-    main(["syslog", NumberOfProcesses, MilliSeconds]),
+    Millis = list_to_integer(MilliSeconds),
+    NumProcs = list_to_integer(NumberOfProcesses),
+    io:format(
+      "Benchmark~n"
+      "---------~n"
+      "  Process(es):         ~p~n"
+      "  Duration:            ~pms~n",
+      [NumProcs, Millis]),
+    ok = error_logger:tty(false),
+    ok = load_app(sasl),
+    ok = application:set_env(sasl, sasl_error_logger, false),
+    ok = start_app(sasl),
+    {ok, Socket} = gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]),
+    io:format("  Application:         lager~n"),
+    catch main_impl("lager", NumProcs, Millis, Socket),
+    io:format("  Application:         log4erl~n"),
+    catch main_impl("log4erl", NumProcs, Millis, Socket),
+    io:format("  Application:         syslog~n"),
+    catch main_impl("syslog", NumProcs, Millis, Socket),
     %% This is likely to fail or at least take damn long
-    main(["sasl_syslog", NumberOfProcesses, MilliSeconds]);
+    io:format("  Application:         sasl_syslog~n"),
+    catch main_impl("sasl_syslog", NumProcs, Millis, Socket),
+    ok = gen_udp:close(Socket);
 main([App, NumberOfProcesses, MilliSeconds]) ->
     Millis = list_to_integer(MilliSeconds),
     NumProcs = list_to_integer(NumberOfProcesses),
