@@ -11,3 +11,4 @@ benchmark/log4erl
 benchmark/sasl_syslog
 benchmark/syslog
 benchmark/log
+benchmark/benchmark.svg

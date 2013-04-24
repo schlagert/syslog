@@ -24,6 +24,9 @@
 %%% configurable amount of time. The number of messages sent will be reported
 %%% as well as the total duration which includes the time needed to deliver all
 %%% messages and the maximum needed processes memory.
+%%%
+%%% Its probably a good idea to 'nice -19' the benchmark, at least if you're
+%%% trying the `sasl_syslog' case.
 %%% @end
 %%%=============================================================================
 
