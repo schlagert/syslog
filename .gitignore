@@ -2,11 +2,12 @@
 deps
 doc
 *.app
+*.dat
 *.o
 *.beam
 *.plt
-bench/lager
-bench/log4erl
-bench/sasl_syslog
-bench/syslog
-bench/log
+benchmark/lager
+benchmark/log4erl
+benchmark/sasl_syslog
+benchmark/syslog
+benchmark/log

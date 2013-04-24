@@ -47,14 +47,6 @@
 	 "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll"
 	 ]).
 
--define(URL,
-        [
-         {"lager",       "https://github.com/basho/lager.git"},
-         {"log4erl",     "https://github.com/schlagert/log4erl.git"},
-         {"sasl_syslog", "https://github.com/travelping/sasl_syslog.git"},
-         {"syslog",      "https://github.com/schlagert/syslog.git"}
-        ]).
-
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -79,30 +71,20 @@ main(["all", NumberOfProcesses, MilliSeconds]) ->
 main([App, NumberOfProcesses, MilliSeconds]) ->
     Millis = list_to_integer(MilliSeconds),
     NumProcs = list_to_integer(NumberOfProcesses),
-    ProjectDir = filename:join([pwd(), App]),
+    io:format(
+      "Benchmark~n"
+      "---------~n"
+      "  Application:         ~s~n"
+      "  Process(es):         ~p~n"
+      "  Duration:            ~pms~n",
+      [App, NumProcs, Millis]),
     ok = error_logger:tty(false),
     ok = load_app(sasl),
     ok = application:set_env(sasl, sasl_error_logger, false),
     ok = start_app(sasl),
-    ok = retrieve(url(App), ProjectDir),
-    ok = build(ProjectDir),
-    true = code:add_path(filename:join([ProjectDir, "ebin"])),
-    {ok, LogFun} = start(App, ProjectDir),
     {ok, Socket} = gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]),
-    try
-        io:format(
-          "Benchmark~n"
-          "---------~n"
-          "  Application:         ~s~n"
-          "  Process(es):         ~p~n"
-          "  Duration:            ~pms~n",
-          [App, NumProcs, Millis]),
-        ok = run(App, LogFun, NumProcs, Millis, Socket)
-    after
-        gen_udp:close(Socket)
-    end,
-    true = code:del_path(filename:join([ProjectDir, "ebin"])),
-    ok = stop(App, ProjectDir).
+    catch main_impl(App, NumProcs, Millis, Socket),
+    ok = gen_udp:close(Socket).
 
 %%%=============================================================================
 %%% internal functions
@@ -111,7 +93,11 @@ main([App, NumberOfProcesses, MilliSeconds]) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start("lager", ProjectDir) ->
+main_impl("lager", NumProcs, Millis, Socket) ->
+    ProjectDir = filename:join([pwd(), "lager"]),
+    ok = retrieve("https://github.com/basho/lager.git", ProjectDir),
+    ok = build(ProjectDir),
+    true = code:add_path(filename:join([ProjectDir, "ebin"])),
     true = code:add_path(filename:join([ProjectDir, "deps", "goldrush", "ebin"])),
     ok = load_app(lager),
     ok = application:set_env(lager, error_logger_redirect, true),
@@ -119,24 +105,50 @@ start("lager", ProjectDir) ->
     ok = lager:start(),
     true = park_process(user),
     true = register(user, self()),
-    {ok, fun() -> ok = lager:log(info, self(), ?FMT, ?ARGS) end};
-start("log4erl", _) ->
+    LogFun = fun() -> ok = lager:log(info, self(), ?FMT, ?ARGS) end,
+    ok = run(lager, LogFun, NumProcs, Millis, Socket),
+    restore_process(user),
+    application:stop(lager),
+    application:stop(goldrush),
+    true = code:del_path(filename:join([ProjectDir, "deps", "goldrush", "ebin"])),
+    true = code:del_path(filename:join([ProjectDir, "ebin"]));
+main_impl("log4erl", NumProcs, Millis, Socket) ->
+    ProjectDir = filename:join([pwd(), "log4erl"]),
+    ok = retrieve("https://github.com/schlagert/log4erl.git", ProjectDir),
+    ok = build(ProjectDir),
+    true = code:add_path(filename:join([ProjectDir, "ebin"])),
     ok = start_app(log4erl),
     Appender = {info, daemon, "localhost", ?TEST_PORT, "%b %D %t localhost %l"},
     {ok, _} = log4erl:add_syslog_appender(?MODULE, Appender),
-    {ok, fun() -> ok = log4erl:log(info, ?FMT, ?ARGS) end};
-start("sasl_syslog", _) ->
+    LogFun = fun() -> ok = log4erl:log(info, ?FMT, ?ARGS) end,
+    ok = run(log4erl, LogFun, NumProcs, Millis, Socket),
+    application:stop(log4erl),
+    true = code:del_path(filename:join([ProjectDir, "ebin"]));
+main_impl("sasl_syslog", NumProcs, Millis, Socket) ->
+    ProjectDir = filename:join([pwd(), "sasl_syslog"]),
+    ok = retrieve("https://github.com/travelping/sasl_syslog.git", ProjectDir),
+    ok = build(ProjectDir),
+    true = code:add_path(filename:join([ProjectDir, "ebin"])),
     ok = load_app(sasl_syslog),
     ok = application:set_env(sasl_syslog, enabled, true),
     ok = application:set_env(sasl_syslog, remote_host, "localhost"),
     ok = application:set_env(sasl_syslog, remote_port, ?TEST_PORT),
     ok = start_app(sasl_syslog),
-    {ok, fun() -> ok = error_logger:info_msg(?FMT, ?ARGS) end};
-start("syslog", _) ->
+    LogFun = fun() -> ok = error_logger:info_msg(?FMT, ?ARGS) end,
+    ok = run(sasl_syslog, LogFun, NumProcs, Millis, Socket),
+    application:stop(sasl_syslog),
+    true = code:del_path(filename:join([ProjectDir, "ebin"]));
+main_impl("syslog", NumProcs, Millis, Socket) ->
+    ProjectDir = filename:join([pwd(), "..", "..", "syslog"]),
+    ok = build(ProjectDir),
+    true = code:add_path(filename:join([ProjectDir, "ebin"])),
     ok = application:set_env(syslog, dest_host, "localhost"),
     ok = application:set_env(syslog, dest_port, ?TEST_PORT),
     ok = start_app(syslog),
-    {ok, fun() -> ok = syslog:info_msg(?FMT, ?ARGS) end}.
+    LogFun = fun() -> ok = syslog:info_msg(?FMT, ?ARGS) end,
+    ok = run(syslog, LogFun, NumProcs, Millis, Socket),
+    application:stop(syslog),
+    true = code:del_path(filename:join([ProjectDir, "ebin"])).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -144,15 +156,15 @@ start("syslog", _) ->
 run(App, Fun, NumProcs, Millis, Socket) ->
     ok = empty_socket(Socket),
     StartMillis = current_millis(),
-%%    eprof:start(),
-%%    Ps = [lager_sup, lager_event, lager_crash_log, lager_handler_watcher_sup],
-%%    Ps = [syslog_logger, syslog],
-%%    profiling = eprof:start_profiling(Ps),
+    %% eprof:start(),
+    %% Ps = [lager_sup, lager_event, lager_crash_log, lager_handler_watcher_sup],
+    %% Ps = [syslog_logger, syslog],
+    %% profiling = eprof:start_profiling(Ps),
     generate(Fun, NumProcs, Millis),
     {NumSent, Memory} = finalize(Socket, NumProcs),
-%%    eprof:stop_profiling(),
-%%    eprof:log("bench.prof"),
-%%    eprof:analyze(procs),
+    %% eprof:stop_profiling(),
+    %% eprof:log("bench.prof"),
+    %% eprof:analyze(procs),
     report(App, NumSent, Memory, current_millis() - StartMillis).
 
 %%------------------------------------------------------------------------------
@@ -167,30 +179,11 @@ report(App, NumSent, Memory, Duration) ->
       "  Max. memory used :   ~pMB~n",
       [NumSent, NumSentPerSecond, Duration, Memory / 1048576]),
     file:write_file(
-      "bench.dat",
+      "benchmark.dat",
       io_lib:format(
         "~-20s~-10B~-10B~-10B~-10.3f~n",
         [App, NumSent, NumSentPerSecond, Duration, Memory / 1048576]),
       [append]).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-stop("lager", ProjectDir) ->
-    restore_process(user),
-    application:stop(goldrush),
-    true = code:del_path(filename:join([ProjectDir, "deps", "goldrush", "ebin"])),
-    stop(lager, ProjectDir);
-stop(App, ProjectDir) when is_list(App) ->
-    stop(list_to_atom(App), ProjectDir);
-stop(App, _ProjectDir) when is_atom(App) ->
-    application:stop(App),
-    ok.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-url(App) -> proplists:get_value(App, ?URL).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -253,7 +246,8 @@ finalize(_Socket, 0, {MaxMemory, _}, NumSent, NumSent) ->
 finalize(Socket, Left, Memory, NumSent, NumReceived) ->
     NewMemory = memory_snapshot(Memory),
     receive
-        {'DOWN', _, process, _, {ok, Sent}} ->
+        {'DOWN', _, process, Pid, {ok, Sent}} ->
+            io:format("  Message Generation:  ~w completed~n", [Pid]),
             finalize(Socket, Left - 1, NewMemory, NumSent + Sent, NumReceived);
         {'DOWN', _, process, _, _} ->
             finalize(Socket, Left - 1, NewMemory, NumSent, NumReceived);
@@ -316,8 +310,7 @@ wait_for_os_cmd(Port, Cmd) ->
         {Port, {exit_status, Status}} ->
             Reason = io_lib:format("~s failed with ~p", [Cmd, Status]),
             {error, lists:flatten(Reason)};
-        {Port, {data, {Flag, Str}}} when Flag =:= eol orelse Flag =:= noeol->
-            io:format("~s~n", [Str]),
+        {Port, {data, {Flag, _}}} when Flag =:= eol orelse Flag =:= noeol->
             wait_for_os_cmd(Port, Cmd);
         _ ->
             wait_for_os_cmd(Port, Cmd)
@@ -356,14 +349,3 @@ current_millis() ->
     MegaSecs * 1000000 + Secs * 1000 + MicroSecs div 1000.
 current_millis(OffsetMillis) ->
     current_millis() + OffsetMillis.
-
-
-%% lager() ->
-%%     Handlers = [{lager_syslog_backend, ["beam", local0, info]}],
-%%     ok = application:set_env(lager, handlers, Handlers),
-%%     ok = application:start(lager),
-%%     ok = application:start(lager_syslog),
-%%     %% do it
-%%     lager:log(info, self(), "hello world by lager from pid ~p", [self()]),
-%%     application:stop(lager_syslog),
-%%     application:stop(lager).
