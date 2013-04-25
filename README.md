@@ -146,10 +146,7 @@ Performance
 
 Performance profiling has been made with a small script located in the
 `benchmark` subdirectory. The figure below shows the results of
-```erlang
-benchmark.escript all 100 10000
-```
-on an Intel(R) Core(TM)2 Duo CPU running R16B.
+`benchmark.escript all 100 10000` on an Intel(R) Core(TM)2 Duo CPU running R16B.
 
 The above line would start a benchmark that spawns 100 processes that send log
 message using a specific logging framework in a tight loop for 10000ms. All log
@@ -173,7 +170,7 @@ A word about the performance of `lager`. Fitting `lager` into the benchmark
 unfortunately is a bit tricky since the benchmark needs to know when all
 messages were processed. However, `lager_syslog` uses a C port driver calling
 `vsyslog` and thus does not support remote syslog. So instead of testing the
-lager_syslog_backend` the benchmark uses the `lager_console_backend`, setting
+`lager_syslog_backend` the benchmark uses the `lager_console_backend`, setting
 itself as the receiver for I/O messages and forwards them to the UDP socket
 earlier mentioned. This in fact might slowdown `lager` which would explain the
 slightly better results of `syslog`.

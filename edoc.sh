@@ -31,12 +31,13 @@ mv README.md.bak README.md
 rebar clean compile doc
 rm -rf tmp
 cp -f syslog.svg doc/
+cp -f benchmark.svg doc/
 
 # deploy to gh-pages
 if [ "$1" == "deploy" ]; then
     CURRENT=`git branch | grep "*" | awk '{print $2}'`
     git checkout gh-pages
-    rm -f *.html edoc-info erlang.png stylesheet.css syslog.svg
+    rm -f *.html edoc-info erlang.png stylesheet.css syslog.svg benchmark.svg
     cp doc/* .
     git add .
     git commit -a -m "Regenerated site documentation."
