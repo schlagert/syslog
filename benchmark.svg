@@ -173,9 +173,9 @@
 	<g id="Plot_1"><title>Plot_1</title>
 <g style="fill:none; color:red; stroke:currentColor; stroke-width:1.00; stroke-linecap:butt; stroke-linejoin:miter">
 	<g style = 'stroke:none; shape-rendering:crispEdges'>
-		<polygon fill = 'rgb(139,  26,  14)' fill-opacity = '0.900000' points = '81.4,355.0 123.2,355.0 123.2,141.8 81.4,141.8 '/>
+		<polygon fill = 'rgb(139,  26,  14)' fill-opacity = '0.900000' points = '81.4,355.0 123.2,355.0 123.2,128.0 81.4,128.0 '/>
 	</g>
-	<path stroke='rgb(139,  26,  14)'  d='M81.4,355.0 L81.4,141.9 L123.1,141.9 L123.1,355.0 L81.4,355.0 Z '></path>
+	<path stroke='rgb(139,  26,  14)'  d='M81.4,355.0 L81.4,128.1 L123.1,128.1 L123.1,355.0 L81.4,355.0 Z '></path>
 	<g style = 'stroke:none; shape-rendering:crispEdges'>
 		<polygon fill = 'rgb(139,  26,  14)' fill-opacity = '0.900000' points = '150.9,355.0 192.7,355.0 192.7,213.4 150.9,213.4 '/>
 	</g>
@@ -369,7 +369,7 @@
 </g>
 <g style="fill:none; color:black; stroke:currentColor; stroke-width:1.00; stroke-linecap:butt; stroke-linejoin:miter">
 	<g transform="translate(939.8,56.3)" style="stroke:none; fill:black; font-family:Verdana; font-size:10.00pt; text-anchor:middle">
-		<text>Maximum Memory Used</text>
+		<text>Peak Memory Used</text>
 	</g>
 </g>
 <g style="fill:none; color:red; stroke:currentColor; stroke-width:1.00; stroke-linecap:butt; stroke-linejoin:miter">
@@ -377,9 +377,9 @@
 	<g id="Plot_1"><title>Plot_1</title>
 <g style="fill:none; color:red; stroke:currentColor; stroke-width:1.00; stroke-linecap:butt; stroke-linejoin:miter">
 	<g style = 'stroke:none; shape-rendering:crispEdges'>
-		<polygon fill = 'rgb(139,  26,  14)' fill-opacity = '0.900000' points = '814.7,355.0 856.5,355.0 856.5,252.8 814.7,252.8 '/>
+		<polygon fill = 'rgb(139,  26,  14)' fill-opacity = '0.900000' points = '814.7,355.0 856.5,355.0 856.5,277.5 814.7,277.5 '/>
 	</g>
-	<path stroke='rgb(139,  26,  14)'  d='M814.7,355.0 L814.7,252.9 L856.4,252.9 L856.4,355.0 L814.7,355.0 Z '></path>
+	<path stroke='rgb(139,  26,  14)'  d='M814.7,355.0 L814.7,277.6 L856.4,277.6 L856.4,355.0 L814.7,355.0 Z '></path>
 	<g style = 'stroke:none; shape-rendering:crispEdges'>
 		<polygon fill = 'rgb(139,  26,  14)' fill-opacity = '0.900000' points = '884.2,355.0 926.0,355.0 926.0,338.2 884.2,338.2 '/>
 	</g>
