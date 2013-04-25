@@ -141,6 +141,43 @@ This should be done via the API functions provided by the `syslog` module
 which provides functions similar to the ones provided by the `error_logger`
 module (see the `*msg/1,2` functions).
 
+Performance
+-----------
+
+Performance profiling has been made with a small script located in the
+`benchmark` subdirectory. The figure below shows the results of
+```erlang
+benchmark.escript all 100 10000
+```
+on an Intel(R) Core(TM)2 Duo CPU running R16B.
+
+The above line would start a benchmark that spawns 100 processes that send log
+message using a specific logging framework in a tight loop for 10000ms. All log
+messages will be delivered over UDP (faked remote Syslog) to a socket opened by
+the benchmark process. The total duration is the time needed to spawn the
+processes, send the messages __and__ the time needed to receive all sent
+messages on the socket the benchmark process listens on.
+
+<img src="http://schlagert.github.com/syslog/benchmark.svg" alt="benchmark results" />
+
+As expected `syslog` and `lager` are the top performers. The main reason why
+they outperform `log4erl` is the dynamic toggling of synchronous/asynchronous
+logging (`log4erl` uses synchronous logging only).
+
+Since `sasl_syslog` uses the asynchronous `error_logger` the number of messages
+sent is quite huge. However, it also takes a huge amount of time and memory to
+process the long `error_logger` message queue. This is also responsible for the
+low number of messages sent per second in total.
+
+A word about the performance of `lager`. Fitting `lager` into the benchmark
+unfortunately is a bit tricky since the benchmark needs to know when all
+messages were processed. However, `lager_syslog` uses a C port driver calling
+`vsyslog` and thus does not support remote syslog. So instead of testing the
+lager_syslog_backend` the benchmark uses the `lager_console_backend`, setting
+itself as the receiver for I/O messages and forwards them to the UDP socket
+earlier mentioned. This in fact might slowdown `lager` which would explain the
+slightly better results of `syslog`.
+
 Supervision
 -----------
 
