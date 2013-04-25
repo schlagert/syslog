@@ -80,14 +80,14 @@ main(["all", NumberOfProcesses, MilliSeconds]) ->
     ok = start_app(sasl),
     {ok, Socket} = gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]),
     io:format("  Application:         lager~n"),
-    catch main_impl("lager", NumProcs, Millis, Socket),
+    main_impl("lager", NumProcs, Millis, Socket),
     io:format("  Application:         log4erl~n"),
-    catch main_impl("log4erl", NumProcs, Millis, Socket),
+    main_impl("log4erl", NumProcs, Millis, Socket),
     io:format("  Application:         syslog~n"),
-    catch main_impl("syslog", NumProcs, Millis, Socket),
+    main_impl("syslog", NumProcs, Millis, Socket),
     %% This is likely to fail or at least take damn long
     io:format("  Application:         sasl_syslog~n"),
-    catch main_impl("sasl_syslog", NumProcs, Millis, Socket),
+    main_impl("sasl_syslog", NumProcs, Millis, Socket),
     ok = gen_udp:close(Socket);
 main([App, NumberOfProcesses, MilliSeconds]) ->
     Millis = list_to_integer(MilliSeconds),
@@ -104,7 +104,7 @@ main([App, NumberOfProcesses, MilliSeconds]) ->
     ok = application:set_env(sasl, sasl_error_logger, false),
     ok = start_app(sasl),
     {ok, Socket} = gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]),
-    catch main_impl(App, NumProcs, Millis, Socket),
+    main_impl(App, NumProcs, Millis, Socket),
     ok = gen_udp:close(Socket).
 
 %%%=============================================================================
@@ -121,14 +121,17 @@ main_impl("lager", NumProcs, Millis, Socket) ->
     true = code:add_path(filename:join([ProjectDir, "ebin"])),
     true = code:add_path(filename:join([ProjectDir, "deps", "goldrush", "ebin"])),
     ok = load_app(lager),
+    ok = application:set_env(lager, async_threshold, 30),
     ok = application:set_env(lager, error_logger_redirect, true),
     ok = application:set_env(lager, handlers, [{lager_console_backend, info}]),
     ok = lager:start(),
-    true = park_process(user),
+    UserPid = whereis(user),
+    true = unregister(user),
     true = register(user, self()),
     LogFun = fun() -> ok = lager:log(info, self(), ?FMT, ?ARGS) end,
     ok = run(lager, LogFun, NumProcs, Millis, Socket),
-    restore_process(user),
+    true = unregister(user),
+    true = register(user, UserPid),
     application:stop(lager),
     application:stop(goldrush),
     true = code:del_path(filename:join([ProjectDir, "deps", "goldrush", "ebin"])),
@@ -194,10 +197,10 @@ run(App, Fun, NumProcs, Millis, Socket) ->
 report(App, NumSent, Memory, Duration) ->
     NumSentPerSecond = NumSent * 1000 div Duration,
     io:format(
-      "  Total messages sent: ~p~n"
-      "  Messages per second: ~p~n"
-      "  Total duration:      ~pms~n"
-      "  Max. memory used :   ~pMB~n",
+      "  Total Messages Sent: ~p~n"
+      "  Messages per Second: ~p~n"
+      "  Total Duration:      ~pms~n"
+      "  Peak Memory Used:    ~pMB~n",
       [NumSent, NumSentPerSecond, Duration, Memory / 1048576]),
     file:write_file(
       "benchmark.dat",
@@ -262,27 +265,27 @@ generate_loop(Fun, EndMillis, NumMessages) ->
 %%------------------------------------------------------------------------------
 finalize(Socket, NumProcs) ->
     finalize(Socket, NumProcs, {0, 0}, 0, 0).
-finalize(_Socket, 0, {MaxMemory, _}, NumSent, NumSent) ->
+finalize(_Sock, 0, {MaxMemory, _}, NumSent, NumSent) ->
     {NumSent, MaxMemory};
-finalize(Socket, Left, Memory, NumSent, NumReceived) ->
+finalize(Sock, Left, Memory, NumSent, NumReceived) ->
     NewMemory = memory_snapshot(Memory),
     receive
         {'DOWN', _, process, Pid, {ok, Sent}} ->
             io:format("  Message Generation:  ~w completed~n", [Pid]),
-            finalize(Socket, Left - 1, NewMemory, NumSent + Sent, NumReceived);
+            finalize(Sock, Left - 1, NewMemory, NumSent + Sent, NumReceived);
         {'DOWN', _, process, _, _} ->
-            finalize(Socket, Left - 1, NewMemory, NumSent, NumReceived);
-        {udp, Socket, _, _, _} ->
-            finalize(Socket, Left, NewMemory, NumSent, NumReceived + 1);
-        {udp_closed, Socket} ->
+            finalize(Sock, Left - 1, NewMemory, NumSent, NumReceived);
+        {udp, Sock, _, _, _} ->
+            finalize(Sock, Left, NewMemory, NumSent, NumReceived + 1);
+        {udp_closed, Sock} ->
             exit({error, udp_closed});
         {io_request, F, A, {put_chars, unicode, M}} ->
             %% everyone else must do the socket IO, console loggers should
             %% at least fake this here
-            F ! {io_reply, A, gen_udp:send(Socket, "localhost", ?TEST_PORT, M)},
-            finalize(Socket, Left, NewMemory, NumSent, NumReceived);
+            F ! {io_reply, A, gen_udp:send(Sock, "localhost", ?TEST_PORT, M)},
+            finalize(Sock, Left, NewMemory, NumSent, NumReceived);
         _ ->
-            finalize(Socket, Left, NewMemory, NumSent, NumReceived)
+            finalize(Sock, Left, NewMemory, NumSent, NumReceived)
     end.
 
 %%------------------------------------------------------------------------------
@@ -341,26 +344,6 @@ wait_for_os_cmd(Port, Cmd) ->
 %% @private
 %%------------------------------------------------------------------------------
 pwd() -> {ok, Dir} = file:get_cwd(), Dir.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-park_process(Name)         -> park_process(Name, whereis(Name)).
-park_process(_, undefined) -> true;
-park_process(Name, Pid)    -> unregister(Name), register(parked, Pid).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-restore_process(Name) ->
-    case whereis(parked) of
-        Pid when is_pid(Pid) ->
-            unregister(parked),
-            catch unregister(Name),
-            register(Name, Pid);
-        _ ->
-            true
-    end.
 
 %%------------------------------------------------------------------------------
 %% @private

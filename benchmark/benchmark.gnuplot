@@ -27,7 +27,7 @@ set title 'Total Duration'
 set ylabel 'milliseconds'
 plot 'benchmark.dat' using 4:xticlabel(1) lt rgb '#8b1a0e' title ''
 
-set title 'Maximum Memory Used'
+set title 'Peak Memory Used'
 set ylabel 'megabytes'
 set logscale y
 set yrange [10:4000]
