@@ -22,7 +22,11 @@ perl -pi -e "s/\'\'\'erlang/\`\`\`/g" README.md
 # create overview.edoc
 echo "@title syslog - An RFC3164 and RF5424 compliant logging framework for Erlang." > doc/overview.edoc
 echo "" >> doc/overview.edoc
-sed -r -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
+if [ `uname -s` == "Darwin" ]; then
+    sed -E -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
+else
+    sed -r -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
+fi
 
 # restore original README.md
 mv README.md.bak README.md
