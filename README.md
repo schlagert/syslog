@@ -33,6 +33,7 @@ Features
 * Log messages and standard `error_logger` reports according to RFC 3164
   (BSD Syslog) or RFC 5424 (Syslog Protocol) without the need for drivers,
   ports or NIFs.
+* System independent logging to local or remote facilities using UDP.
 * Robust event handlers - using supervised event handler subscription.
 * Optionally independent error messages using a separate facility.
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
@@ -147,7 +148,7 @@ Performance
 -----------
 
 Performance profiling has been made with a small script located in the
-`benchmark` subdirectory. The figures below shows the results of
+`benchmark` subdirectory. The figures below show the results of
 `benchmark.escript all 100 10000` on an Intel(R) Core(TM)2 Duo CPU running R16B.
 
 The above line starts a benchmark that will spawn 100 processes that each send
@@ -174,7 +175,7 @@ messages were processed. However, `lager_syslog` uses a C port driver calling
 `vsyslog` and thus does not support remote syslog. So instead of testing the
 `lager_syslog_backend` the benchmark uses the `lager_console_backend`, setting
 itself as the receiver for I/O messages and forwards them to the UDP socket
-mentioned earlier. This would in fact slow down `lager` a bit, which would 
+mentioned earlier. This would in fact slow down `lager` a bit, which would
 explain the slightly better performance of `syslog`.
 
 Supervision
