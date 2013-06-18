@@ -71,7 +71,7 @@
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
-    {ok, Socket} = gen_udp:open(0, [binary, {reuseaddr, true}]),
+    {ok, Socket} = gen_udp:open(0, [binary]),
     {ok, #state{
             socket          = Socket,
             protocol        = get_protocol(),
