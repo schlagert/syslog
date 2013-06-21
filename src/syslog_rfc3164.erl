@@ -134,7 +134,8 @@ digit(N)  -> integer_to_list(N).
 
 get_date_test() ->
     R = #syslog_report{timestamp = {1365,283256,908235}},
-    ?assertEqual("Apr  6 23:20:56", lists:flatten(get_date(R))).
+    Rx = "Apr  6 \\d\\d:20:56",
+    ?assertMatch({match, _}, re:run(lists:flatten(get_date(R)), Rx)).
 
 get_hostname_test() ->
     R1 = #syslog_report{hostname = "host.domain.com", domain = "domain.com"},
@@ -152,8 +153,8 @@ to_iolist_test() ->
 		       beam_pid = "12345",
 		       pid = "init",
 		       msg = "info goes here"},
-    ?assertEqual(
-       "<165>Apr  6 23:20:56 host beam[12345] init - info goes here",
-       binary_to_list(iolist_to_binary(to_iolist(R)))).
+    Rx = "<165>Apr  6 \\d\\d:20:56 host beam\\[12345\\] init - info goes here",
+    Actual = binary_to_list(iolist_to_binary(to_iolist(R))),
+    ?assertMatch({match, _}, re:run(Actual, Rx)).
 
 -endif.
