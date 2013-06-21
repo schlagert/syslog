@@ -26,6 +26,7 @@ logging and supervised event handler registration.
 
 * [Code](http://github.com/schlagert/syslog)
 * [EDoc](http://schlagert.github.com/syslog)
+* [![Build Status](https://travis-ci.org/schlagert/syslog.png?branch=master)](https://travis-ci.org/schlagert/syslog)
 
 Features
 --------
