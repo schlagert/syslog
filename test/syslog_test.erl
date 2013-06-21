@@ -110,6 +110,6 @@ load(App) -> load(App, application:load(App)).
 load(_, ok) -> ok;
 load(App, {error, {already_loaded, App}}) -> ok.
 
-read(Socket) -> receive {udp, Socket, _, _, Bin} -> binary_to_list(Bin) end.
+read(Socket) -> receive {udp, Socket, _, _, Bin} -> io:format(standard_error, "got ~s~n", [binary_to_list(Bin)]), binary_to_list(Bin) end.
 
 empty_mailbox() -> receive _ -> empty_mailbox() after ?TIMEOUT -> ok end.
