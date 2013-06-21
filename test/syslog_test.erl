@@ -33,24 +33,24 @@ rfc3164_test() ->
     Date = Month ++ " (\\s|\\d)\\d \\d\\d:\\d\\d:\\d\\d",
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<29>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re1 = "<29>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    Re2 = "<26>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    Re3 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re3 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
-    Re4 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello",
+    Re4 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello",
     ?assertMatch({match, _}, re:run(read(Socket), Re4)),
-    Re5 = "<27>" ++ Date ++ " \\w+ \\w+\\[\\d+\\] " ++ Pid ++ " - world",
+    Re5 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - world",
     ?assertMatch({match, _}, re:run(read(Socket), Re5)),
 
     teardown(Socket).
@@ -62,24 +62,24 @@ rfc5424_test() ->
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<29>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    Re1 = "<29>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    Re2 = "<26>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    Re3 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    Re3 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
     ?assertMatch({match, _}, re:run(read(Socket), Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
-    Re4 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - hello",
+    Re4 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello",
     ?assertMatch({match, _}, re:run(read(Socket), Re4)),
-    Re5 = "<27>1 " ++ Date ++ " \\w+ \\w+ \\d+ " ++ Pid ++ " - world",
+    Re5 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - world",
     ?assertMatch({match, _}, re:run(read(Socket), Re5)),
 
     teardown(Socket).
@@ -110,6 +110,6 @@ load(App) -> load(App, application:load(App)).
 load(_, ok) -> ok;
 load(App, {error, {already_loaded, App}}) -> ok.
 
-read(Socket) -> receive {udp, Socket, _, _, Bin} -> io:format(standard_error, "got ~s~n", [binary_to_list(Bin)]), binary_to_list(Bin) end.
+read(Socket) -> receive {udp, Socket, _, _, Bin} -> binary_to_list(Bin) end.
 
 empty_mailbox() -> receive _ -> empty_mailbox() after ?TIMEOUT -> ok end.
