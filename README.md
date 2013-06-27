@@ -115,6 +115,13 @@ are available and can be configured in the application environment:
   length exceeds this limit all logging statements will be synchronous, blocking
   the calling process until the logging request was processed. Default is `30`.
 
+If your application really needs fast asynchronous logging and doesn't care
+about lost log messages, logging should be done using the `error_logger` API and
+the `syslog` application should be configured so that
+`async_limit > msg_queue_limit`. This should prevent `syslog` from switching to
+synchronous mode as well as limiting the `error_logger` message queue to a
+reasonable size.
+
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It
 only disables non-SASL logging via, for example `error_logger:info_msg/1,2`.
