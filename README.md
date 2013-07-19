@@ -90,8 +90,8 @@ are available and can be configured in the application environment:
 * `{crash_facility, syslog:facility()}`
 
   Specifies the facility Syslog packets with severity `crash`, will be sent
-  with. It *replaces* the previous `error_facility` property. This accompanies
-  *a change in behaviour*. Starting with release `2.0.0` error messages will
+  with. It __replaces__ the previous `error_facility` property. This accompanies
+  __a change in behaviour__. Starting with release `2.0.0` error messages will
   also be sent with `facility`. Only crash and supervisor reports will be sent
   to this (maybe) separate facility. If the values of the properties `facility`
   and `crash_facility` differ a short one-line summary will additionally be sent
