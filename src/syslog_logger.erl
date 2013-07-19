@@ -69,7 +69,7 @@ start_link() ->
 %% Forwards a log message to all registered gen_event handlers.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(syslog:severity(), pid() | atom(), string()) -> ok.
+-spec msg(syslog:severity(), pid() | atom(), binary()) -> ok.
 msg(Severity, Pid, Msg) ->
     Fun = get_fun(),
     PidStr = syslog_lib:get_pid(Pid),

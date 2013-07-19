@@ -43,7 +43,7 @@
           msgs_to_drop = 0    :: non_neg_integer(),
           dropped = {0, 0, 0} :: {integer(), integer(), integer()},
           no_progress         :: boolean(),
-          verbosity           :: true | {false, pos_integer()},
+          verbose             :: true | {false, pos_integer()},
           msg_queue_limit     :: pos_integer() | infinity}).
 
 %%------------------------------------------------------------------------------
@@ -52,7 +52,7 @@
 init(_Arg) ->
     {ok, #state{
             no_progress     = syslog_lib:get_property(no_progress, ?NO_PROGRESS),
-            verbosity       = syslog_lib:get_property(verbose, ?VERBOSITY),
+            verbose         = syslog_lib:get_property(verbose, ?VERBOSITY),
             msg_queue_limit = syslog_lib:get_property(msg_queue_limit, ?LIMIT)}}.
 
 %%------------------------------------------------------------------------------
@@ -140,25 +140,32 @@ log_msg(Severity, Pid, Fmt, Args, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+log_msg(Severity, Pid, Binary, State) ->
+    syslog:msg(Severity, Pid, Binary),
+    State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 log_report(_, Pid, crash_report, Report, State) ->
     Time = calendar:now_to_local_time(os:timestamp()),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
-    Msg = lists:flatten(sasl_report:format_report(fd, all, Event)),
-    log_msg(critical, Pid, Msg, [], State);
+    Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
+    log_msg(critical, Pid, Msg, State);
 log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
     log_msg(informational, Pid, "started application ~w on node ~w", [A, N], State);
-log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbosity = true}) ->
+log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = true}) ->
     log_msg(error, Pid, "application ~w exited with ~p", [A, R], State);
-log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbosity = {false, D}}) ->
+log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = {false, D}}) ->
     log_msg(error, Pid, "application ~w exited with ~P", [A, R, D], State);
 log_report(_, _, progress, _, State = #state{no_progress = true}) ->
     State;
-log_report(_, Pid, progress, Report, State = #state{verbosity = true}) ->
+log_report(_, Pid, progress, Report, State = #state{verbose = true}) ->
     Details = proplists:get_value(started, Report, []),
     Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
     log_msg(informational, Pid, "started child ~s with ~p", [Child, Mfargs], State);
-log_report(_, Pid, progress, Report, State = #state{verbosity = {false, D}}) ->
+log_report(_, Pid, progress, Report, State = #state{verbose = {false, D}}) ->
     Details = proplists:get_value(started, Report, []),
     Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
@@ -166,9 +173,9 @@ log_report(_, Pid, progress, Report, State = #state{verbosity = {false, D}}) ->
 log_report(_, Pid, supervisor_report, Report, State) ->
     Time = calendar:now_to_local_time(os:timestamp()),
     Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
-    Msg = lists:flatten(sasl_report:format_report(fd, all, Event)),
-    log_msg(error, Pid, Msg, [], State);
-log_report(Severity, Pid, _, Report, State = #state{verbosity = true}) ->
+    Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
+    log_msg(error, Pid, Msg, State);
+log_report(Severity, Pid, _, Report, State = #state{verbose = true}) ->
     log_msg(Severity, Pid, "~p", [Report], State);
-log_report(Severity, Pid, _, Report, State = #state{verbosity = {false, D}}) ->
+log_report(Severity, Pid, _, Report, State = #state{verbose = {false, D}}) ->
     log_msg(Severity, Pid, "~P", [Report, D], State).

@@ -147,8 +147,9 @@ error_msg(Fmt, Args) -> msg(error, Fmt, Args).
 %% Logs a format message with a specific severity. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(severity(), string(), [term()]) -> ok.
-msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
+-spec msg(severity(), string() | pid(), [term()] | binary()) -> ok.
+msg(Severity, Fmt, Args) when is_list(Fmt)  -> msg(Severity, self(), Fmt, Args);
+msg(Severity, Pid, Msg) when is_binary(Msg) -> forward_msg(Severity, Pid, Msg).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -159,12 +160,7 @@ msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 -spec msg(severity(), pid(), string(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
     try
-        Msg = lists:flatten(io_lib:format(Fmt, Args)),
-        try
-            syslog_logger:msg(Severity, Pid, Msg)
-        catch
-            _:_ -> ?ERR("~s~n", [Msg])
-        end
+        forward_msg(Severity, Pid, iolist_to_binary(io_lib:format(Fmt, Args)))
     catch
         C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
     end.
@@ -220,3 +216,13 @@ event_mgr(M) -> spec(M, dynamic).
 %% @private
 %%------------------------------------------------------------------------------
 spec(M, Ms) -> {M, {M, start_link, []}, transient, brutal_kill, worker, Ms}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+forward_msg(Severity, Pid, Msg) ->
+    try
+        syslog_logger:msg(Severity, Pid, Msg)
+    catch
+        _:_ -> ?ERR("~s~n", [Msg])
+    end.
