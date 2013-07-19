@@ -58,7 +58,7 @@
           socket          :: gen_udp:socket(),
           protocol        :: module(),
           facility        :: syslog:facility(),
-          error_facility  :: syslog:facility(),
+          crash_facility  :: syslog:facility(),
           dest_host       :: inet:ip_address() | inet:hostname(),
           dest_port       :: inet:port_number(),
           hostname        :: string(),
@@ -76,7 +76,7 @@ init(_Arg) ->
             socket          = Socket,
             protocol        = get_protocol(),
             facility        = syslog_lib:get_property(facility, ?FACILITY),
-            error_facility  = syslog_lib:get_property(error_facility, ?FACILITY),
+            crash_facility  = syslog_lib:get_property(crash_facility, ?FACILITY),
             dest_host       = syslog_lib:get_property(dest_host, ?DEST_HOST),
             dest_port       = syslog_lib:get_property(dest_port, ?DEST_PORT),
             hostname        = syslog_lib:get_hostname(),
@@ -175,11 +175,8 @@ get_bom(_)          -> <<>>.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-severity_to_facility(emergency, #state{error_facility = F}) -> map_facility(F);
-severity_to_facility(alert,     #state{error_facility = F}) -> map_facility(F);
-severity_to_facility(critical,  #state{error_facility = F}) -> map_facility(F);
-severity_to_facility(error,     #state{error_facility = F}) -> map_facility(F);
-severity_to_facility(_,         #state{facility = F})       -> map_facility(F).
+severity_to_facility(crash, #state{crash_facility = F}) -> map_facility(F);
+severity_to_facility(_,     #state{facility = F})       -> map_facility(F).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -219,4 +216,5 @@ map_severity(error)         -> 3;
 map_severity(warning)       -> 4;
 map_severity(notice)        -> 5;
 map_severity(informational) -> 6;
-map_severity(debug)         -> 7.
+map_severity(debug)         -> 7;
+map_severity(crash)         -> 3.

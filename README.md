@@ -87,10 +87,15 @@ are available and can be configured in the application environment:
 
   Specifies the facility Syslog packets will be sent with. Default is `daemon`.
 
-* `{error_facility, syslog:facility()}`
+* `{crash_facility, syslog:facility()}`
 
-  Specifies the facility Syslog packets with severity `error`, `critical`,
-  `alert` or `emergency` will be sent with. Default is `daemon`.
+  Specifies the facility Syslog packets with severity `crash`, will be sent
+  with. It *replaces* the previous `error_facility` property. This accompanies
+  *a change in behaviour*. Starting with release `2.0.0' error messages will
+  also be sent with `facility`. Only crash and supervisor reports will be sent
+  to this (maybe) separate facility. If the values of the properties `facility`
+  and `crash_facility` differ a short one-line summary will additionally be sent
+  to `facility`. Default is `daemon`.
 
 * `{verbose, true | {false, Depth :: pos_integer()}}`
 
@@ -185,6 +190,34 @@ messages were processed. However, `lager_syslog` uses a C port driver calling
 itself as the receiver for I/O messages and forwards them to the UDP socket
 mentioned earlier. This would in fact slow down `lager` a bit, which would
 explain the slightly better performance of `syslog`.
+
+History
+-------
+
+### Version 2.0.0
+
+* Replace the property `error_facility` with `crash_facility`. Refer to the
+  explanation of `crash_facility` above to learn more about this behaviour
+  change.
+* Performance improvements (e.g. binary as internal message format)
+
+### Version 1.0.0
+
+* Provide discrete API for robust `error_logger` independent logging
+* Automatic toggling of sync/async logging for better load protection (default)
+* Various performance improvements (e.g. timestamps, process name resolution)
+* Configurable verbosity of progress report logging
+* Support for release upgrades
+
+### Version 0.0.9
+
+* Supervised `error_logger` integration
+* Message queue length based load protection
+* RFC 3164 compliant backend (default)
+* RFC 5424 compliant backend
+* Support for local and remote facilities using UDP
+* Separate facility for error messages (default off)
+* Standard SASL event format for `supervisor` and `crash` reports
 
 Supervision
 -----------

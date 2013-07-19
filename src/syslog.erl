@@ -52,7 +52,7 @@
                     local5 | local6 | local7.
 
 -type severity() :: emergency | alert | critical | error | warning | notice |
-                    informational | debug.
+                    informational | debug | crash.
 
 -type option() :: {dest_host, inet:ip_address() | inet:hostname()} |
                   {dest_port, inet:port_number()} |
