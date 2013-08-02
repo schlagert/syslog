@@ -1,7 +1,9 @@
-{"1.0.0",
+{"2.0.0",
  [
+  {"1.0.0", [{restart_application, syslog}]},
   {"0.0.9", [{restart_application, syslog}]}
  ],
  [
+  {"1.0.0", [{restart_application, syslog}]},
   {"0.0.9", [{restart_application, syslog}]}
  ]}.
