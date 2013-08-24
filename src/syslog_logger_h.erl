@@ -55,7 +55,7 @@
 %%%=============================================================================
 
 -record(state, {
-          socket          :: gen_udp:socket(),
+          socket          :: inet:socket(),
           protocol        :: module(),
           facility        :: syslog:facility(),
           crash_facility  :: syslog:facility(),
