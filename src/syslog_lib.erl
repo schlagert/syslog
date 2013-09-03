@@ -81,15 +81,18 @@ get_property_(_, Value)         -> Value.
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns a string representation for a process. This will be either the
+%% Returns a string representation for a process. This will either be the
 %% (locally) registered name of the process or its process id.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_pid(pid() | atom()) -> string().
-get_pid(N) when is_atom(N) -> atom_to_list(N);
-get_pid(P) when is_pid(P)  -> get_pid(process_info(P, registered_name), P).
-get_pid({registered_name, N}, _) -> atom_to_list(N);
-get_pid(_, P)                    -> pid_to_list(P).
+get_pid(N) when is_atom(N) ->
+    atom_to_list(N);
+get_pid(P) when is_pid(P) ->
+    case catch process_info(P, registered_name) of
+        {registered_name, N} -> atom_to_list(N);
+        _                    -> pid_to_list(P)
+    end.
 
 %%%=============================================================================
 %%% TESTS
