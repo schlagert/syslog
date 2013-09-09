@@ -160,11 +160,11 @@ log_msg(Severity, Pid, Fmt, Args, State) ->
 log_report(_, Pid, crash_report, Report, State) ->
     log_crash(State#state.extra_report, Pid, Report, State);
 log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
-    log_msg(informational, Pid, "started application ~w on node ~w", [A, N], State);
+    log_msg(informational, Pid, "started application ~s on node ~w", [A, N], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = true}) ->
-    log_msg(error, Pid, "application ~w exited with ~p", [A, R], State);
+    log_msg(error, Pid, "application ~s exited with ~p", [A, R], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = {false, D}}) ->
-    log_msg(error, Pid, "application ~w exited with ~P", [A, R, D], State);
+    log_msg(error, Pid, "application ~s exited with ~P", [A, R, D], State);
 log_report(_, _, progress, _, State = #state{no_progress = true}) ->
     State;
 log_report(_, Pid, progress, Report, State = #state{verbose = true}) ->
