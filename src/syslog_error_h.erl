@@ -35,13 +35,6 @@
 
 -include("syslog.hrl").
 
-%% ** Generic server ... terminating
--define(SERVER_ERR, [$*,$*,32,$G,$e,$n,$e,$r,$i,$c,32,$s,$e,$r,$v,$e,$r,32 | _]).
-%% ** State machine ... terminating
--define(FSM_ERR,    [$*,$*,32,$S,$t,$a,$t,$e,32,$m,$a,$c,$h,$i,$n,$e,32 | _]).
-%% ** gen_event handler ... crashed
--define(EVENT_ERR,  [$*,$*,32,$g,$e,$n,$_,$e,$v,$e,$n,$t,32,$h,$a,$n,$d,$l,$e,$r,32 | _]).
-
 %%%=============================================================================
 %%% gen_event callbacks
 %%%=============================================================================
@@ -126,11 +119,11 @@ drop_msg_(_                     , {E, W, I}) -> {E, W, I}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_msg({error, _, {Pid, Fmt = ?SERVER_ERR, Args}}, State) ->
+handle_msg({error, _, {Pid, Fmt = ["** Generic server " | _], Args}}, State) ->
     log_msg(crash, Pid, Fmt, Args, State);
-handle_msg({error, _, {Pid, Fmt = ?FSM_ERR, Args}}, State) ->
+handle_msg({error, _, {Pid, Fmt = ["** State machine " | _], Args}}, State) ->
     log_msg(crash, Pid, Fmt, Args, State);
-handle_msg({error, _, {Pid, Fmt = ?EVENT_ERR, Args}}, State) ->
+handle_msg({error, _, {Pid, Fmt = ["** gen_event handler" | _], Args}}, State) ->
     log_msg(crash, Pid, Fmt, Args, State);
 handle_msg({error, _, {Pid, Fmt, Args}}, State) ->
     log_msg(error, Pid, Fmt, Args, State);
@@ -160,7 +153,7 @@ log_msg(Severity, Pid, Fmt, Args, State) ->
 log_report(_, Pid, crash_report, Report, State) ->
     log_crash(State#state.extra_report, Pid, Report, State);
 log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
-    log_msg(informational, Pid, "started application ~s on node ~w", [A, N], State);
+    log_msg(informational, Pid, "started application ~s on node ~s", [A, N], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = true}) ->
     log_msg(error, Pid, "application ~s exited with ~p", [A, R], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = {false, D}}) ->
