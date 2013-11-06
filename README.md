@@ -194,6 +194,10 @@ explain the slightly better performance of `syslog`.
 History
 -------
 
+### Master
+
+* Development, currently no difference to version 2.0.0.
+
 ### Version 2.0.0
 
 * Replace the property `error_facility` with `crash_facility`. Refer to the
