@@ -1,6 +1,8 @@
 syslog
 ======
 
+[![Build Status](https://travis-ci.org/schlagert/syslog.png?branch=master)](https://travis-ci.org/schlagert/syslog)
+
 A Syslog based logging framework for Erlang. This project is inspired by the
 great work put in the two projects
 [sasl_syslog](http://github.com/travelping/sasl_syslog) and
@@ -23,10 +25,6 @@ rotation, no line formatting and no tracing support. However, `syslog` does not
 rely on port drivers or NIFs to implement the Syslog protocol and it includes
 most of the beloved features known from `lager`, for example sync/async
 logging and supervised event handler registration.
-
-* [Code](http://github.com/schlagert/syslog)
-* [EDoc](http://schlagert.github.com/syslog)
-* [![Build Status](https://travis-ci.org/schlagert/syslog.png?branch=master)](https://travis-ci.org/schlagert/syslog)
 
 Features
 --------
@@ -171,7 +169,7 @@ opened by the benchmark process. The total duration is the time it took to spawn
 the processes, send the messages __and__ the time it took to receive all sent
 messages at the socket that the benchmark process listens on.
 
-<img src="http://schlagert.github.com/syslog/benchmark.svg" alt="benchmark results" />
+<img src="https://cloud.githubusercontent.com/assets/404313/12110992/20d2254c-b392-11e5-83dc-64cc59bd7ad6.png" alt="benchmark results" />
 
 As expected `syslog` and `lager` are the top performers. The main reason why
 they outperform `log4erl` is the dynamic toggling of synchronous/asynchronous
@@ -226,7 +224,7 @@ History
 Supervision
 -----------
 
-<img src="http://schlagert.github.com/syslog/syslog.svg" alt="syslog supervision" />
+<img src="https://cloud.githubusercontent.com/assets/404313/12110956/c59eec28-b391-11e5-936d-4e236f702ef0.png" alt="syslog supervision" />
 
 For the curious; the above illustration shows the very simple supervision
 hierarchy used by the `syslog` application.
