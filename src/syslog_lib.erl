@@ -29,6 +29,8 @@
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
 
+-include_lib("kernel/include/inet.hrl").
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -36,24 +38,37 @@
 %%------------------------------------------------------------------------------
 %% @doc
 %% Returns the hostname of the running node. This may include the fully
-%% qualified domain name.
+%% qualified domain name. The hostname will usually be the host part of the
+%% node name, except for the cases when the node is not alive or some strange
+%% host part was set, e.g. something related to the loopback interface. In this
+%% case the hostname will be what `inet:gethostname/0` returns.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_hostname() -> string().
-get_hostname()                -> get_hostname(atom_to_list(node())).
-get_hostname("nonode@nohost") -> {ok, Hostname} = inet:gethostname(), Hostname;
-get_hostname(Node)            -> hd(lists:reverse(string:tokens(Node, "@"))).
+get_hostname() ->
+    get_hostname(get_hostpart(node())).
+get_hostname(HostPart) ->
+    case lists:member(HostPart, ["nohost" | get_loopback_names()]) of
+        true  -> element(2, inet:gethostname());
+        false -> HostPart
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% Returns the domain name of the running node. If the node was started using
-%% short names, the returned string may be empty.
+%% short names or if an IP address was set as host part of the node name, the
+%% returned string may be empty.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_domain() -> string().
-get_domain()           -> get_domain(string:tokens(get_hostname(), ".")).
-get_domain([_])        -> "";
-get_domain([_ | Rest]) -> string:join(Rest, ".").
+get_domain() ->
+    get_domain(get_hostname()).
+get_domain(Hostname) ->
+    case {inet:parse_address(Hostname), string:tokens(Hostname, ".")} of
+        {{ok, _}, _}    -> "";
+        {_, [_]}        -> "";
+        {_, [_ | Rest]} -> string:join(Rest, ".")
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -95,6 +110,43 @@ get_pid(P) when is_pid(P) ->
     end.
 
 %%%=============================================================================
+%%% internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_hostpart(Node) ->
+    hd(lists:reverse(string:tokens(atom_to_list(Node), "@"))).
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Return all possible names of the available loopback interfaces, e.g.
+%% `["127.0.0.1", "localhost", "localhost.localdomain", ...]'
+%%------------------------------------------------------------------------------
+get_loopback_names() ->
+    Addresses = get_loopback_addresses(),
+    lists:append(
+      [Name || Addr <- Addresses,
+               Name <- [inet:ntoa(Addr)],
+               is_list(Name)],
+      [Name || Addr <- Addresses,
+               {ok, Hostent} <- [inet:gethostbyaddr(Addr)],
+               Name <- [Hostent#hostent.h_name | Hostent#hostent.h_aliases],
+               is_list(Name)]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Returns the IPv4 addresses associated with the available loopback interfaces.
+%%------------------------------------------------------------------------------
+get_loopback_addresses() ->
+    [Addr || {ok, IfList} <- [inet:getifaddrs()],
+             {_, IfProps} <- IfList,
+             {addr, Addr = {_, _, _, _}} <- IfProps,
+             {flags, IfFlags} <- IfProps,
+             lists:member(loopback, IfFlags)].
+
+%%%=============================================================================
 %%% TESTS
 %%%=============================================================================
 
@@ -104,14 +156,17 @@ get_pid(P) when is_pid(P) ->
 
 get_hostname_test() ->
     {ok, InetReturn} = inet:gethostname(),
-    ?assertEqual(InetReturn,        get_hostname("nonode@nohost")),
-    ?assertEqual("hostname",        get_hostname("nodename@hostname")),
-    ?assertEqual("hostname.domain", get_hostname("nodename@hostname.domain")).
+    ?assertEqual(InetReturn,        get_hostname("nohost")),
+    ?assertEqual(InetReturn,        get_hostname("127.0.0.1")),
+    ?assertEqual(InetReturn,        get_hostname("localhost")),
+    ?assertEqual("hostname",        get_hostname("hostname")),
+    ?assertEqual("hostname.domain", get_hostname("hostname.domain")).
 
 get_domain_test() ->
-    ?assertEqual("",          get_domain(string:tokens("host", "."))),
-    ?assertEqual("domain",    get_domain(string:tokens("host.domain", "."))),
-    ?assertEqual("domain.de", get_domain(string:tokens("host.domain.de", "."))).
+    ?assertEqual("",          get_domain("host")),
+    ?assertEqual("",          get_domain("127.0.0.1")),
+    ?assertEqual("domain",    get_domain("host.domain")),
+    ?assertEqual("domain.de", get_domain("host.domain.de")).
 
 get_name_test() ->
     ?assertEqual("beam",     get_name("nonode@nohost")),
