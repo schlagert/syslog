@@ -128,7 +128,7 @@ get_loopback_names() ->
     Addresses = get_loopback_addresses(),
     lists:append(
       [Name || Addr <- Addresses,
-               Name <- [inet:ntoa(Addr)],
+               Name <- [ntoa(Addr)],
                is_list(Name)],
       [Name || Addr <- Addresses,
                {ok, Hostent} <- [inet:gethostbyaddr(Addr)],
@@ -145,6 +145,11 @@ get_loopback_addresses() ->
              {addr, Addr = {_, _, _, _}} <- IfProps,
              {flags, IfFlags} <- IfProps,
              lists:member(loopback, IfFlags)].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+ntoa(IPv4) -> lists:flatten(io_lib:format("~w.~w.~w.~w", tuple_to_list(IPv4))).
 
 %%%=============================================================================
 %%% TESTS
