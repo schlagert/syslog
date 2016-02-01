@@ -64,8 +64,8 @@ get_hostname(HostPart) ->
 get_domain() ->
     get_domain(get_hostname()).
 get_domain(Hostname) ->
-    case {inet:parse_address(Hostname), string:tokens(Hostname, ".")} of
-        {{ok, _}, _}    -> "";
+    case {is_ip4(Hostname), string:tokens(Hostname, ".")} of
+        {true, _}       -> "";
         {_, [_]}        -> "";
         {_, [_ | Rest]} -> string:join(Rest, ".")
     end.
@@ -150,6 +150,11 @@ get_loopback_addresses() ->
 %% @private
 %%------------------------------------------------------------------------------
 ntoa(IPv4) -> lists:flatten(io_lib:format("~w.~w.~w.~w", tuple_to_list(IPv4))).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+is_ip4(Str) -> re:run(Str, "\\d+.\\d+.\\d+.\\d+", [{capture, none}]) =:= match.
 
 %%%=============================================================================
 %%% TESTS
