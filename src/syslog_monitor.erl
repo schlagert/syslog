@@ -47,6 +47,8 @@
          {syslog_logger, syslog_logger_h}
         ]).
 
+-include("syslog.hrl").
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -71,7 +73,7 @@ start_link() -> gen_server:start_link(?MODULE, [], []).
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    [ok = gen_event:add_sup_handler(M, H, []) || {M, H} <- ?REGISTRATIONS],
+    ok = lists:foreach(fun add_handler/1, ?REGISTRATIONS),
     {ok, #state{}}.
 
 %%------------------------------------------------------------------------------
@@ -87,12 +89,13 @@ handle_cast(_Request, State) -> {noreply, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({gen_event_EXIT, {_EventHandler, _EventMgr}, shutdown}, State) ->
+handle_info({gen_event_EXIT, _Handler, shutdown}, State) ->
     %% the respective event manager was shutdown properly, we can also RIP
     {stop, normal, State};
-handle_info({gen_event_EXIT, {EventHandler, EventMgr}, _}, State) ->
+handle_info({gen_event_EXIT, Handler, Reason}, State) ->
     %% accidential unregistration, try to re-subscribe the event handler
-    ok = gen_event:add_sup_handler(EventMgr, EventHandler, []),
+    ok = ?ERR("~s - handler ~w exited with ~w~n", [?MODULE, Handler, Reason]),
+    ok = add_handler(lists:keyfind(Handler, 2, ?REGISTRATIONS)),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -106,3 +109,14 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %% @private
 %%------------------------------------------------------------------------------
 terminate(_Reason, _State) -> ok.
+
+%%%=============================================================================
+%%% internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+add_handler({Manager, Handler}) ->
+    ok = gen_event:add_sup_handler(Manager, Handler, []),
+    ?ERR("~s - added handler ~w to manager ~s~n", [?MODULE, Handler, Manager]).
