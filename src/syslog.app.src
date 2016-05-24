@@ -16,7 +16,7 @@
 {application, syslog,
   [{description, "A Syslog based logger for error_logger reports."},
    {id, "com.github.schlagert"},
-   {vsn, "2.0.1"},
+   {vsn, "2.0.2"},
    {registered,
     [
      syslog_logger
