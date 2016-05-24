@@ -194,7 +194,12 @@ History
 
 ### Master
 
-* Development, currently no difference to version 2.0.0.
+* Development, currently no difference to version 2.0.1.
+
+### Version 2.0.1
+
+* Fix event handler supervision. Due to a defective match pattern in
+  `syslog_monitor` crashed handlers did not get re-added as expected/supposed.
 
 ### Version 2.0.0
 
