@@ -55,12 +55,11 @@
 %%%=============================================================================
 
 -record(state, {
-          socket          :: inet:socket(),
+          no_queue        :: boolean(),
+          hibernate_timer :: timer:tref() | undefined,
           protocol        :: module(),
           facility        :: syslog:facility(),
           crash_facility  :: syslog:facility(),
-          dest_host       :: inet:ip_address() | inet:hostname(),
-          dest_port       :: inet:port_number(),
           hostname        :: string(),
           domain          :: string(),
           appname         :: string(),
@@ -71,14 +70,11 @@
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
-    {ok, Socket} = gen_udp:open(0, [binary]),
     {ok, #state{
-            socket          = Socket,
+            no_queue        = syslog_lib:get_property(no_queue, false),
             protocol        = get_protocol(),
             facility        = syslog_lib:get_property(facility, ?FACILITY),
             crash_facility  = syslog_lib:get_property(crash_facility, ?FACILITY),
-            dest_host       = syslog_lib:get_property(dest_host, ?DEST_HOST),
-            dest_port       = syslog_lib:get_property(dest_port, ?DEST_PORT),
             hostname        = syslog_lib:get_hostname(),
             domain          = syslog_lib:get_domain(),
             appname         = syslog_lib:get_name(),
@@ -89,7 +85,8 @@ init(_Arg) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_event({log, Timestamp, Severity, Pid, Msg}, State) ->
-    {ok, send(get_report(Timestamp, Severity, Pid, Msg, State), State)};
+    send(get_report(Timestamp, Severity, Pid, Msg, State), State),
+    {ok, need_timer(Msg, State)};
 handle_event(_, State) ->
     {ok, State}.
 
@@ -101,13 +98,15 @@ handle_call(_Request, State) -> {ok, undef, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp_closed, S}, #state{socket = S}) -> {error, {udp_closed, S}};
-handle_info(_Info, State)                        -> {ok, State}.
+handle_info(hibernate, State) ->
+  {ok, State#state{hibernate_timer = undefined}, hibernate};
+handle_info(_Info, State) ->
+  {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Arg, #state{socket = Socket}) -> gen_udp:close(Socket).
+terminate(_Arg, _) -> ok.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -117,6 +116,15 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+need_timer(Msg, State = #state{hibernate_timer = undefiner}) when byte_size(Msg) > 64 ->
+  TRef = erlang:send_after(1000, self(), hibernate),
+  State#state{hibernate_timer = TRef};
+need_timer(_, State) ->
+  State.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -137,26 +145,10 @@ get_report(Timestamp, Severity, Pid, Msg, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send(Report, State = #state{protocol = Protocol}) ->
-    [send_datagram(Protocol:to_iolist(R), State) || R <- split(Report)],
-    State.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-send_datagram(Data, #state{socket = S, dest_host = H, dest_port = P}) ->
-    ok = gen_udp:send(S, H, P, Data).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-split(R = #syslog_report{msg = Msg}) ->
-    [R#syslog_report{msg = Line} || Line <- split_impl(Msg), Line =/= <<>>].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-split_impl(Bin) when is_binary(Bin) -> binary:split(Bin, <<"\n">>, [global]).
+send(Report, #state{protocol = Protocol, no_queue = false}) ->
+  syslog_udp_sup:send(Report, Protocol);
+send(Report, #state{protocol = Protocol, no_queue = true}) ->
+  syslog_udp_sup:send_if_available(Report, Protocol).
 
 %%------------------------------------------------------------------------------
 %% @private
