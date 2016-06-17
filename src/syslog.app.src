@@ -19,6 +19,7 @@
    {vsn, "2.0.2"},
    {registered,
     [
+     poolboy,
      syslog_logger
     ]},
    {applications, [kernel, stdlib, sasl]},
