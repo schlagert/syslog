@@ -97,7 +97,8 @@ setup(Protocol) ->
     ?assertEqual(ok, load(AppSpec)),
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
-    ?assertEqual(ok, application:start(syslog)),
+    {Res, _} = application:ensure_all_started(syslog),
+    ?assertEqual(ok, Res),
     ?assertEqual(ok, empty_mailbox()),
     gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]).
 

@@ -63,7 +63,7 @@ start_link() ->
 init([]) ->
   PoolConf = form_pool_conf(),
   WorkerConf = form_worker_conf(),
-  {ok, {{simple_one_for_one, 1000, 3600},
+  {ok, {{one_for_one, 1000, 3600},
     [{?SENDER_POOL, {poolboy, start_link, [PoolConf, WorkerConf]}, transient, 5000, worker, [poolboy]}]}}.
 
 %%%===================================================================
@@ -71,7 +71,7 @@ init([]) ->
 %%%===================================================================
 %% @private
 form_pool_conf() ->
-  syslog_lib:get_property(pool_conf, []).
+  [{name, {local, ?SENDER_POOL}} | [{worker_module, syslog_udp_sender} | syslog_lib:get_property(pool_conf, [])]].
 
 %% @private
 form_worker_conf() ->

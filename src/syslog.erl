@@ -200,9 +200,9 @@ stop(_State) -> ok.
 init([]) ->
     Specs =
       [
+        ?CHILD(syslog_udp_sup, supervisor),
         ?CHILD(syslog_logger, worker, dynamic),
-        ?CHILD(syslog_monitor, worker),
-        ?CHILD(syslog_udp_sup, supervisor)
+        ?CHILD(syslog_monitor, worker)
       ],
     {ok, {{one_for_one, 5, 10}, Specs}}.
 

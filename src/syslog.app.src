@@ -18,10 +18,7 @@
    {id, "com.github.schlagert"},
    {vsn, "2.0.2"},
    {registered,
-    [
-     poolboy,
-     syslog_logger
-    ]},
-   {applications, [kernel, stdlib, sasl]},
+    [syslog_logger]},
+   {applications, [kernel, stdlib, sasl, poolboy]},
    {mod, {syslog, []}},
    {env, []}]}.
