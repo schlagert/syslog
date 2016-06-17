@@ -64,7 +64,7 @@ init([]) ->
   PoolConf = form_pool_conf(),
   WorkerConf = form_worker_conf(),
   {ok, {{one_for_one, 1000, 3600},
-    [{?SENDER_POOL, {poolboy, start_link, [PoolConf, WorkerConf]}, transient, 5000, worker, [poolboy]}]}}.
+    [{?SENDER_POOL, {poolboy, start_link, [PoolConf, WorkerConf]}, transient, brutal_kill, worker, [poolboy]}]}}.
 
 %%%===================================================================
 %%% Internal functions
