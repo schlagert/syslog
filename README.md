@@ -136,6 +136,10 @@ are available and can be configured in the application environment:
 * `{appname, string()}`:
 
   Application name, reported to syslog. Default is `node()`.
+  
+* `{log_level, emergency | alert | critical | crash | error | warning | notice | informational | debug}`:
+
+  Log level. Default is `debug`.
 
 
 If your application really needs fast asynchronous logging and doesn't care

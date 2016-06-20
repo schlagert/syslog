@@ -55,6 +55,7 @@
 %%%=============================================================================
 
 -record(state, {
+          log_level       :: non_neg_integer(),
           no_queue        :: boolean(),
           hibernate_timer :: timer:tref() | undefined,
           protocol        :: module(),
@@ -71,6 +72,7 @@
 %%------------------------------------------------------------------------------
 init(_Arg) ->
     {ok, #state{
+            log_level       = map_severity(syslog_lib:get_property(log_level, debug)),
             no_queue        = syslog_lib:get_property(no_queue, false),
             protocol        = get_protocol(),
             facility        = syslog_lib:get_property(facility, ?FACILITY),
@@ -84,9 +86,15 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, Timestamp, Severity, Pid, Msg}, State) ->
-    send(get_report(Timestamp, Severity, Pid, Msg, State), State),
-    {ok, need_timer(Msg, State)};
+handle_event({log, Timestamp, Severity, Pid, Msg}, State = #state{log_level = Level}) ->
+    SeverityNum = map_severity(Severity),
+    case Severity > Level of
+      true ->
+        {ok, State};
+      false ->
+        send(get_report(Timestamp, SeverityNum, Pid, Msg, State), State),
+        {ok, need_timer(Msg, State)}
+    end;
 handle_event(_, State) ->
     {ok, State}.
 
@@ -131,7 +139,7 @@ need_timer(_, State) ->
 %%------------------------------------------------------------------------------
 get_report(Timestamp, Severity, Pid, Msg, State) ->
     #syslog_report{
-       severity  = map_severity(Severity),
+       severity  = Severity,
        facility  = severity_to_facility(Severity, State),
        timestamp = Timestamp,
        pid       = Pid,
@@ -205,8 +213,8 @@ map_severity(emergency)     -> 0;
 map_severity(alert)         -> 1;
 map_severity(critical)      -> 2;
 map_severity(error)         -> 3;
+map_severity(crash)         -> 3;
 map_severity(warning)       -> 4;
 map_severity(notice)        -> 5;
 map_severity(informational) -> 6;
-map_severity(debug)         -> 7;
-map_severity(crash)         -> 3.
+map_severity(debug)         -> 7.
