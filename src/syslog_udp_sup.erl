@@ -14,7 +14,7 @@
 -include("syslog.hrl").
 
 %% API
--export([start_link/0, send/2, return_worker/0, send_if_available/2]).
+-export([start_link/0, send/2, return_worker/0, send_if_available/2, status/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -46,6 +46,9 @@ send_if_available(Report, Protocol) ->
 
 return_worker() ->
   poolboy:checkin(?SENDER_POOL, self()).
+
+status() ->
+  poolboy:status(?SENDER_POOL).
 
 %%--------------------------------------------------------------------
 %% @doc
