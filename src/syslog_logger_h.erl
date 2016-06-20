@@ -88,7 +88,7 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 handle_event({log, Timestamp, Severity, Pid, Msg}, State = #state{log_level = Level}) ->
     SeverityNum = map_severity(Severity),
-    case Severity > Level of
+    case SeverityNum > Level of
       true ->
         {ok, State};
       false ->
