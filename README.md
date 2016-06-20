@@ -127,11 +127,15 @@ are available and can be configured in the application environment:
   By default pool_conf is [], which means 5 pool_size with 10 overflow workers, which 
   will be created on report and destroyed immediately.
   
-* `{no_queue, boolean()}` :
+* `{no_queue, boolean()}`:
 
   If no queue is specified, `syslog_logger_h` will drop every report, while pool is busy,
   and no more overflow processes available. Default is `false`. Recommended to use with
   high `max_overflow` value.
+  
+* `{appname, string()}`:
+
+  Application name, reported to syslog. Default is `node()`.
 
 
 If your application really needs fast asynchronous logging and doesn't care
