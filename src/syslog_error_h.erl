@@ -195,7 +195,6 @@ log_crash(false, Pid, Report, State) ->
     Time = calendar:now_to_local_time(os:timestamp()),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
     Msg = <<<<"[crash] ">>/binary, (iolist_to_binary(sasl_report:format_report(fd, all, Event)))/binary>>,
-    Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
     syslog:msg(?CRASH, Pid, Msg),
     State;
 log_crash(true, Pid, Report = [SubReport | _], State) ->
