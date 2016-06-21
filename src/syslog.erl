@@ -163,7 +163,7 @@ msg(Severity, Pid, Msg) when is_binary(Msg) -> forward_msg(Severity, Pid, Msg).
 -spec msg(severity(), pid(), string(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
     try
-        forward_msg(Severity, Pid, iolist_to_binary(io_lib:format(Fmt, Args)))
+        forward_msg(Severity, Pid, iolist_to_binary(io_lib:format("[~s] " ++ Fmt, [Severity | Args])))
     catch
         C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
     end.
