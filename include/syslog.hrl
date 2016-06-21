@@ -41,6 +41,20 @@
 -define(ERR(Fmt, Args), io:format(standard_error, Fmt, Args)).
 
 %%%=============================================================================
+%%% Define for log level.
+%%%=============================================================================
+
+-define(EMERGENCY, emergency).
+-define(ALERT, alert).
+-define(CRITICAL, critical).
+-define(ERROR, error).
+-define(CRASH, crash).
+-define(WARNING, warning).
+-define(NOTICE, notice).
+-define(INFORMATIONAL, info).
+-define(DEBUG, debug).
+
+%%%=============================================================================
 %%% Defines for default values.
 %%%=============================================================================
 

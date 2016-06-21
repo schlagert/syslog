@@ -38,7 +38,7 @@ rfc3164_test() ->
     Re1 = "<29>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
+    ?assertEqual(ok, syslog:msg(?CRITICAL, "hello world", [])),
     Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
@@ -67,7 +67,7 @@ rfc5424_test() ->
     Re1 = "<29>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
+    ?assertEqual(ok, syslog:msg(?CRITICAL, "hello world", [])),
     Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 

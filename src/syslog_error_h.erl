@@ -112,7 +112,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 drop_msg(Msg, State = #state{msgs_to_drop = 0, dropped = Dropped}) ->
     {E, W, I} = drop_msg_(Msg, Dropped),
     Fmt = "dropped ~p errors, ~p warnings, ~p notices",
-    log_msg(error, self(), Fmt, [E, W, I], State#state{dropped = {0, 0, 0}});
+    log_msg(?ERROR, self(), Fmt, [E, W, I], State#state{dropped = {0, 0, 0}});
 drop_msg(Msg, State = #state{dropped = Dropped}) ->
     State#state{dropped = drop_msg_(Msg, Dropped)}.
 drop_msg_({error, _, _}         , {E, W, I}) -> {E + 1, W, I};
@@ -127,23 +127,23 @@ drop_msg_(_                     , {E, W, I}) -> {E, W, I}.
 %% @private
 %%------------------------------------------------------------------------------
 handle_msg({error, _, {Pid, Fmt = ?SERVER_ERR, Args}}, State) ->
-    log_msg(crash, Pid, Fmt, Args, State);
+    log_msg(?CRASH, Pid, Fmt, Args, State);
 handle_msg({error, _, {Pid, Fmt = ?FSM_ERR, Args}}, State) ->
-    log_msg(crash, Pid, Fmt, Args, State);
+    log_msg(?CRASH, Pid, Fmt, Args, State);
 handle_msg({error, _, {Pid, Fmt = ?EVENT_ERR, Args}}, State) ->
-    log_msg(crash, Pid, Fmt, Args, State);
+    log_msg(?CRASH, Pid, Fmt, Args, State);
 handle_msg({error, _, {Pid, Fmt, Args}}, State) ->
-    log_msg(error, Pid, Fmt, Args, State);
+    log_msg(?ERROR, Pid, Fmt, Args, State);
 handle_msg({error_report, _, {Pid, Type, Report}}, State) ->
-    log_report(error, Pid, Type, Report, State);
+    log_report(?ERROR, Pid, Type, Report, State);
 handle_msg({warning_msg, _, {Pid, Fmt, Args}}, State) ->
-    log_msg(warning, Pid, Fmt, Args, State);
+    log_msg(?WARNING, Pid, Fmt, Args, State);
 handle_msg({warning_report, _, {Pid, Type, Report}}, State) ->
-    log_report(warning, Pid, Type, Report, State);
+    log_report(?WARNING, Pid, Type, Report, State);
 handle_msg({info_msg, _, {Pid, Fmt, Args}}, State) ->
-    log_msg(informational, Pid, Fmt, Args, State);
+    log_msg(?INFORMATIONAL, Pid, Fmt, Args, State);
 handle_msg({info_report, _, {Pid, Type, Report}}, State) ->
-    log_report(informational, Pid, Type, Report, State);
+    log_report(?INFORMATIONAL, Pid, Type, Report, State);
 handle_msg(_, State) ->
     State.
 
@@ -160,28 +160,28 @@ log_msg(Severity, Pid, Fmt, Args, State) ->
 log_report(_, Pid, crash_report, Report, State) ->
     log_crash(State#state.extra_report, Pid, Report, State);
 log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
-    log_msg(informational, Pid, "started application ~s on node ~s", [A, N], State);
+    log_msg(?INFORMATIONAL, Pid, "started application ~s on node ~s", [A, N], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = true}) ->
-    log_msg(error, Pid, "application ~s exited with ~p", [A, R], State);
+    log_msg(?ERROR, Pid, "application ~s exited with ~p", [A, R], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = {false, D}}) ->
-    log_msg(error, Pid, "application ~s exited with ~P", [A, R, D], State);
+    log_msg(?ERROR, Pid, "application ~s exited with ~P", [A, R, D], State);
 log_report(_, _, progress, _, State = #state{no_progress = true}) ->
     State;
 log_report(_, Pid, progress, Report, State = #state{verbose = true}) ->
     Details = proplists:get_value(started, Report, []),
     Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
-    log_msg(informational, Pid, "started child ~s with ~p", [Child, Mfargs], State);
+    log_msg(?INFORMATIONAL, Pid, "started child ~s with ~p", [Child, Mfargs], State);
 log_report(_, Pid, progress, Report, State = #state{verbose = {false, D}}) ->
     Details = proplists:get_value(started, Report, []),
     Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
-    log_msg(informational, Pid, "started child ~s with ~P", [Child, Mfargs, D], State);
+    log_msg(?INFORMATIONAL, Pid, "started child ~s with ~P", [Child, Mfargs, D], State);
 log_report(_, Pid, supervisor_report, Report, State) ->
     Time = calendar:now_to_local_time(os:timestamp()),
     Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
     Msg = <<<<"[crash] ">>/binary, (iolist_to_binary(sasl_report:format_report(fd, all, Event)))/binary>>,
-    syslog:msg(crash, Pid, Msg),
+    syslog:msg(?CRASH, Pid, Msg),
     State;
 log_report(Severity, Pid, _, Report, State = #state{verbose = true}) ->
     log_msg(Severity, Pid, "~p", [Report], State);
@@ -196,17 +196,17 @@ log_crash(false, Pid, Report, State) ->
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
     Msg = <<<<"[crash] ">>/binary, (iolist_to_binary(sasl_report:format_report(fd, all, Event)))/binary>>,
     Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
-    syslog:msg(crash, Pid, Msg),
+    syslog:msg(?CRASH, Pid, Msg),
     State;
 log_crash(true, Pid, Report = [SubReport | _], State) ->
     NewState = log_crash(false, Pid, Report, State),
     try proplists:get_value(error_info, SubReport) of
         {Class, {Reason, Stack}, _} when is_list(Stack) ->
-            log_msg(error, Pid, "exited with ~w", [{Class, Reason}], NewState);
+            log_msg(?ERROR, Pid, "exited with ~w", [{Class, Reason}], NewState);
         {Class, Reason, _} ->
-            log_msg(error, Pid, "exited with ~w", [{Class, Reason}], NewState);
+            log_msg(?ERROR, Pid, "exited with ~w", [{Class, Reason}], NewState);
         _ ->
-            log_msg(error, Pid, "exited with ~w", [SubReport], NewState)
+            log_msg(?ERROR, Pid, "exited with ~w", [SubReport], NewState)
     catch
-        _:_ -> log_msg(error, Pid, "exited with ~w", [SubReport], NewState)
+        _:_ -> log_msg(?ERROR, Pid, "exited with ~w", [SubReport], NewState)
     end.

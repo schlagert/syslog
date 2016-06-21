@@ -175,7 +175,7 @@ get_bom(_)          -> <<>>.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-severity_to_facility(crash, #state{crash_facility = F}) -> map_facility(F);
+severity_to_facility(?CRASH, #state{crash_facility = F}) -> map_facility(F);
 severity_to_facility(_,     #state{facility = F})       -> map_facility(F).
 
 %%------------------------------------------------------------------------------
@@ -209,12 +209,12 @@ map_facility(local7)   -> 23.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-map_severity(emergency)     -> 0;
-map_severity(alert)         -> 1;
-map_severity(critical)      -> 2;
-map_severity(error)         -> 3;
-map_severity(crash)         -> 3;
-map_severity(warning)       -> 4;
-map_severity(notice)        -> 5;
-map_severity(informational) -> 6;
-map_severity(debug)         -> 7.
+map_severity(?EMERGENCY)     -> 0;
+map_severity(?ALERT)         -> 1;
+map_severity(?CRITICAL)      -> 2;
+map_severity(?ERROR)         -> 3;
+map_severity(?CRASH)         -> 3;
+map_severity(?WARNING)       -> 4;
+map_severity(?NOTICE)        -> 5;
+map_severity(?INFORMATIONAL) -> 6;
+map_severity(?DEBUG)         -> 7.

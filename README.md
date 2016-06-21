@@ -137,7 +137,7 @@ are available and can be configured in the application environment:
 
   Application name, reported to syslog. Default is `node()`.
   
-* `{log_level, emergency | alert | critical | crash | error | warning | notice | informational | debug}`:
+* `{log_level, emergency | alert | critical | crash | error | warning | notice | info | debug}`:
 
   Log level. Default is `debug`.
 
