@@ -128,7 +128,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-need_timer(Msg, State = #state{hibernate_timer = undefiner}) when byte_size(Msg) > 64 ->
+need_timer(Msg, State = #state{hibernate_timer = undefined}) when byte_size(Msg) > 64 ->
   TRef = erlang:send_after(1000, self(), hibernate),
   State#state{hibernate_timer = TRef};
 need_timer(_, State) ->
