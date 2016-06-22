@@ -80,6 +80,7 @@ msg(Severity, Pid, Msg) ->
 %%%=============================================================================
 
 -record(state, {
+          hibernate_timer :: timer:tref() | undefined,
           async = true  :: boolean(),
           async_limit   :: pos_integer()}).
 
@@ -93,16 +94,19 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, _, _, _, _}, State = #state{async_limit = AsyncLimit}) ->
+handle_event({log, _, _, _, Msg}, State = #state{async_limit = AsyncLimit}) when AsyncLimit /= undefined ->
     {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
+  UState = need_timer(Msg, State),
     case {QueueLen > AsyncLimit, State#state.async} of
         {true, true} ->
-            {ok, set_fun(sync, State#state{async = false})};
+            {ok, set_fun(sync, UState#state{async = false})};
         {false, false} ->
-            {ok, set_fun(async, State#state{async = true})};
+            {ok, set_fun(async, UState#state{async = true})};
         _ ->
-            {ok, State}
+            {ok, UState}
     end;
+handle_event({log, _, _, _, Msg}, State) ->
+    {ok, need_timer(Msg, State)};
 handle_event(_, State) ->
     {ok, State}.
 
@@ -114,6 +118,8 @@ handle_call(_Request, State) -> {ok, undef, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+handle_info(hibernate, State) ->
+  {ok, State#state{hibernate_timer = undefined}, hibernate};
 handle_info(_Info, State) -> {ok, State}.
 
 %%------------------------------------------------------------------------------
@@ -130,6 +136,14 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%% internal functions
 %%%=============================================================================
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+need_timer(Msg, State = #state{hibernate_timer = undefined}) when byte_size(Msg) > 64 ->
+  TRef = erlang:send_after(1000, self(), hibernate),
+  State#state{hibernate_timer = TRef};
+need_timer(_, State) ->
+  State.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------

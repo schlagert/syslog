@@ -38,7 +38,7 @@ rfc3164_test() ->
     Re1 = "<29>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
+    ?assertEqual(ok, syslog:msg(?CRITICAL, "hello world", [])),
     Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
@@ -67,7 +67,7 @@ rfc5424_test() ->
     Re1 = "<29>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
+    ?assertEqual(ok, syslog:msg(?CRITICAL, "hello world", [])),
     Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re2)),
 
@@ -97,7 +97,8 @@ setup(Protocol) ->
     ?assertEqual(ok, load(AppSpec)),
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
-    ?assertEqual(ok, application:start(syslog)),
+    {Res, _} = application:ensure_all_started(syslog),
+    ?assertEqual(ok, Res),
     ?assertEqual(ok, empty_mailbox()),
     gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]).
 

@@ -55,12 +55,12 @@
 %%%=============================================================================
 
 -record(state, {
-          socket          :: inet:socket(),
+          log_level       :: non_neg_integer(),
+          no_queue        :: boolean(),
+          hibernate_timer :: timer:tref() | undefined,
           protocol        :: module(),
           facility        :: syslog:facility(),
           crash_facility  :: syslog:facility(),
-          dest_host       :: inet:ip_address() | inet:hostname(),
-          dest_port       :: inet:port_number(),
           hostname        :: string(),
           domain          :: string(),
           appname         :: string(),
@@ -71,14 +71,12 @@
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
-    {ok, Socket} = gen_udp:open(0, [binary]),
     {ok, #state{
-            socket          = Socket,
+            log_level       = map_severity(syslog_lib:get_property(log_level, debug)),
+            no_queue        = syslog_lib:get_property(no_queue, false),
             protocol        = get_protocol(),
             facility        = syslog_lib:get_property(facility, ?FACILITY),
             crash_facility  = syslog_lib:get_property(crash_facility, ?FACILITY),
-            dest_host       = syslog_lib:get_property(dest_host, ?DEST_HOST),
-            dest_port       = syslog_lib:get_property(dest_port, ?DEST_PORT),
             hostname        = syslog_lib:get_hostname(),
             domain          = syslog_lib:get_domain(),
             appname         = syslog_lib:get_name(),
@@ -88,8 +86,15 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, Timestamp, Severity, Pid, Msg}, State) ->
-    {ok, send(get_report(Timestamp, Severity, Pid, Msg, State), State)};
+handle_event({log, Timestamp, Severity, Pid, Msg}, State = #state{log_level = Level}) ->
+    SeverityNum = map_severity(Severity),
+    case SeverityNum > Level of
+      true ->
+        {ok, State};
+      false ->
+        send(get_report(Timestamp, SeverityNum, Pid, Msg, State), State),
+        {ok, need_timer(Msg, State)}
+    end;
 handle_event(_, State) ->
     {ok, State}.
 
@@ -101,13 +106,15 @@ handle_call(_Request, State) -> {ok, undef, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp_closed, S}, #state{socket = S}) -> {error, {udp_closed, S}};
-handle_info(_Info, State)                        -> {ok, State}.
+handle_info(hibernate, State) ->
+  {ok, State#state{hibernate_timer = undefined}, hibernate};
+handle_info(_Info, State) ->
+  {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Arg, #state{socket = Socket}) -> gen_udp:close(Socket).
+terminate(_Arg, _) -> ok.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -121,9 +128,18 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+need_timer(Msg, State = #state{hibernate_timer = undefined}) when byte_size(Msg) > 64 ->
+  TRef = erlang:send_after(1000, self(), hibernate),
+  State#state{hibernate_timer = TRef};
+need_timer(_, State) ->
+  State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_report(Timestamp, Severity, Pid, Msg, State) ->
     #syslog_report{
-       severity  = map_severity(Severity),
+       severity  = Severity,
        facility  = severity_to_facility(Severity, State),
        timestamp = Timestamp,
        pid       = Pid,
@@ -137,26 +153,10 @@ get_report(Timestamp, Severity, Pid, Msg, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send(Report, State = #state{protocol = Protocol}) ->
-    [send_datagram(Protocol:to_iolist(R), State) || R <- split(Report)],
-    State.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-send_datagram(Data, #state{socket = S, dest_host = H, dest_port = P}) ->
-    ok = gen_udp:send(S, H, P, Data).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-split(R = #syslog_report{msg = Msg}) ->
-    [R#syslog_report{msg = Line} || Line <- split_impl(Msg), Line =/= <<>>].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-split_impl(Bin) when is_binary(Bin) -> binary:split(Bin, <<"\n">>, [global]).
+send(Report, #state{protocol = Protocol, no_queue = false}) ->
+  syslog_udp_sup:send(Report, Protocol);
+send(Report, #state{protocol = Protocol, no_queue = true}) ->
+  syslog_udp_sup:send_if_available(Report, Protocol).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -175,7 +175,7 @@ get_bom(_)          -> <<>>.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-severity_to_facility(crash, #state{crash_facility = F}) -> map_facility(F);
+severity_to_facility(?CRASH, #state{crash_facility = F}) -> map_facility(F);
 severity_to_facility(_,     #state{facility = F})       -> map_facility(F).
 
 %%------------------------------------------------------------------------------
@@ -209,12 +209,12 @@ map_facility(local7)   -> 23.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-map_severity(emergency)     -> 0;
-map_severity(alert)         -> 1;
-map_severity(critical)      -> 2;
-map_severity(error)         -> 3;
-map_severity(warning)       -> 4;
-map_severity(notice)        -> 5;
-map_severity(informational) -> 6;
-map_severity(debug)         -> 7;
-map_severity(crash)         -> 3.
+map_severity(?EMERGENCY)     -> 0;
+map_severity(?ALERT)         -> 1;
+map_severity(?CRITICAL)      -> 2;
+map_severity(?ERROR)         -> 3;
+map_severity(?CRASH)         -> 3;
+map_severity(?WARNING)       -> 4;
+map_severity(?NOTICE)        -> 5;
+map_severity(?INFORMATIONAL) -> 6;
+map_severity(?DEBUG)         -> 7.

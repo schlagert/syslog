@@ -78,7 +78,11 @@ get_domain(Hostname) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_name() -> string().
-get_name()                -> get_name(atom_to_list(node())).
+get_name()                ->
+  case syslog_lib:get_property(appname, undefined) of
+    undefined -> get_name(atom_to_list(node()));
+    Name -> Name
+  end.
 get_name("nonode@nohost") -> "beam";
 get_name(Node)            -> hd(string:tokens(Node, "@")).
 

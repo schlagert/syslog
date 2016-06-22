@@ -26,7 +26,7 @@ monitor_test() ->
     process_flag(trap_exit, true),
 
     ok = application:start(sasl),
-    ok = application:start(syslog),
+    {ok, _} = application:ensure_all_started(syslog),
 
     ?assert(has_hander(syslog_logger_h, syslog_logger)),
     gen_event:delete_handler(syslog_logger, syslog_logger_h, []),

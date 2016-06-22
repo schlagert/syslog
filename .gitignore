@@ -12,3 +12,6 @@ benchmark/log4erl
 benchmark/sasl_syslog
 benchmark/syslog
 benchmark/log
+/.idea/
+*.iml
+ebin

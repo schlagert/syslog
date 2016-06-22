@@ -28,6 +28,11 @@
 -behaviour(application).
 -behaviour(supervisor).
 
+-define(CHILD(I, Type, Mod), {I, {I, start_link, []}, transient, brutal_kill, Type, Mod}).
+-define(CHILD(I, Type), ?CHILD(I, Type, [I])).
+
+-include("syslog.hrl").
+
 %% API
 -export([debug_msg/1,
          debug_msg/2,
@@ -51,8 +56,8 @@
                     clock | local0 | local1 | local2 | local3 | local4 |
                     local5 | local6 | local7.
 
--type severity() :: emergency | alert | critical | error | warning | notice |
-                    informational | debug | crash.
+-type severity() :: ?EMERGENCY | ?ALERT | ?CRITICAL | ?ERROR | ?WARNING | ?NOTICE |
+                    ?INFORMATIONAL | ?DEBUG | ?CRASH.
 
 -type option() :: {dest_host, inet:ip_address() | inet:hostname()} |
                   {dest_port, inet:port_number()} |
@@ -65,8 +70,6 @@
                   {no_progress, boolean()}.
 
 -export_type([facility/0, severity/0, option/0]).
-
--include("syslog.hrl").
 
 %%%=============================================================================
 %%% API
@@ -86,7 +89,7 @@ debug_msg(Msg) -> debug_msg(Msg, []).
 %% @end
 %%------------------------------------------------------------------------------
 -spec debug_msg(string(), [term()]) -> ok.
-debug_msg(Fmt, Args) -> msg(debug, Fmt, Args).
+debug_msg(Fmt, Args) -> msg(?DEBUG, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -104,7 +107,7 @@ info_msg(Msg) -> info_msg(Msg, []).
 %% @end
 %%------------------------------------------------------------------------------
 -spec info_msg(string(), [term()]) -> ok.
-info_msg(Fmt, Args) -> msg(notice, Fmt, Args).
+info_msg(Fmt, Args) -> msg(?NOTICE, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -122,7 +125,7 @@ warning_msg(Msg) -> warning_msg(Msg, []).
 %% @end
 %%------------------------------------------------------------------------------
 -spec warning_msg(string(), [term()]) -> ok.
-warning_msg(Fmt, Args) -> msg(warning, Fmt, Args).
+warning_msg(Fmt, Args) -> msg(?WARNING, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -140,7 +143,7 @@ error_msg(Msg) -> error_msg(Msg, []).
 %% @end
 %%------------------------------------------------------------------------------
 -spec error_msg(string(), [term()]) -> ok.
-error_msg(Fmt, Args) -> msg(error, Fmt, Args).
+error_msg(Fmt, Args) -> msg(?ERROR, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -160,7 +163,7 @@ msg(Severity, Pid, Msg) when is_binary(Msg) -> forward_msg(Severity, Pid, Msg).
 -spec msg(severity(), pid(), string(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
     try
-        forward_msg(Severity, Pid, iolist_to_binary(io_lib:format(Fmt, Args)))
+        forward_msg(Severity, Pid, iolist_to_binary(io_lib:format("[~s] " ++ Fmt, [Severity | Args])))
     catch
         C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
     end.
@@ -195,27 +198,17 @@ stop(_State) -> ok.
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    Specs = [event_mgr(syslog_logger), server(syslog_monitor)],
+    Specs =
+      [
+        ?CHILD(syslog_udp_sup, supervisor),
+        ?CHILD(syslog_logger, worker, dynamic),
+        ?CHILD(syslog_monitor, worker)
+      ],
     {ok, {{one_for_one, 5, 10}, Specs}}.
 
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-server(M) -> spec(M, [M]).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-event_mgr(M) -> spec(M, dynamic).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-spec(M, Ms) -> {M, {M, start_link, []}, transient, brutal_kill, worker, Ms}.
 
 %%------------------------------------------------------------------------------
 %% @private

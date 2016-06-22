@@ -110,20 +110,47 @@ are available and can be configured in the application environment:
   output. So if you you don't care when a new process is started, set this
   flag to `true`. Default is `false`.
 
-* `{async_limit, pos_integer()}`:
+* `{async_limit, pos_integer() | undefined}`:
 
   Specifies the number of entries in the `syslog_logger` message queue to which
   asynchronous logging is allowed. As long as the message queue does not exceed
   this limit every logging statement will by asynchronous. If the message queue
   length exceeds this limit all logging statements will be synchronous, blocking
   the calling process until the logging request was processed. Default is `30`.
+  
+* `{pool_conf, proplist()}`:
+
+  Specifies the configuration of udp pool senders. `pool_size` - number of workers
+  in a pool. `max_overflow` - number of workers to be created when base workers are
+  busy. `overflow_ttl` - number of milliseconds to keep created overflow workers,
+  `overflow_check_period` - period in milliseconds to check for overflow workers ttl.
+  By default pool_conf is [], which means 5 pool_size with 10 overflow workers, which 
+  will be created on report and destroyed immediately.
+  
+* `{no_queue, boolean()}`:
+
+  If no queue is specified, `syslog_logger_h` will drop every report, while pool is busy,
+  and no more overflow processes available. Default is `false`. Recommended to use with
+  high `max_overflow` value.
+  
+* `{appname, string()}`:
+
+  Application name, reported to syslog. Default is `node()`.
+  
+* `{log_level, emergency | alert | critical | crash | error | warning | notice | info | debug}`:
+
+  Log level. Default is `debug`.
+
 
 If your application really needs fast asynchronous logging and doesn't care
 about lost log messages, logging should be done using the `error_logger` API and
 the `syslog` application should be configured so that
 `async_limit > msg_queue_limit`. This should prevent `syslog` from switching to
 synchronous mode as well as limiting the `error_logger` message queue to a
-reasonable size.
+reasonable size.  
+
+Or switching to synchronous loging can be switched off by setting `async_limit` 
+as `undefined`.  
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It
