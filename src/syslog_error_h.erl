@@ -35,6 +35,11 @@
 
 -include("syslog.hrl").
 
+-define(FACILITY,    ?SYSLOG_FACILITY).
+-define(LIMIT,       infinity).
+-define(NO_PROGRESS, false).
+-define(VERBOSITY,   true).
+
 %% ** Generic server ... terminating
 -define(SERVER_ERR, [$*,$*,32,$G,$e,$n,$e,$r,$i,$c,32,$s,$e,$r,$v,$e,$r,32 | _]).
 %% ** State machine ... terminating

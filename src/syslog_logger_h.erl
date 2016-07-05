@@ -40,6 +40,11 @@
 
 -include("syslog.hrl").
 
+-define(DEST_HOST, {127, 0, 0, 1}).
+-define(DEST_PORT, 514).
+-define(FACILITY,  ?SYSLOG_FACILITY).
+-define(PROTOCOL,  rfc3164).
+
 %%%=============================================================================
 %%% callback definitions
 %%%=============================================================================

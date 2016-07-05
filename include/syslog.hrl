@@ -55,16 +55,9 @@
 -define(ERR(Fmt, Args), io:format(standard_error, Fmt, Args)).
 
 %%%=============================================================================
-%%% Defines for default values.
+%%% Defines the default Syslog facility.
 %%%=============================================================================
 
--define(FACILITY,    daemon).
--define(PROTOCOL,    rfc3164).
--define(DEST_HOST,   {127, 0, 0, 1}).
--define(DEST_PORT,   514).
--define(LIMIT,       infinity).
--define(VERBOSITY,   true).
--define(NO_PROGRESS, false).
--define(ASYNC_LIMIT, 30).
+-define(SYSLOG_FACILITY, daemon).
 
 -endif. %% syslog_hrl_
