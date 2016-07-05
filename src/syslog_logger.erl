@@ -73,7 +73,8 @@ start_link() ->
 msg(Severity, Pid, Msg) ->
     Fun = get_fun(),
     PidStr = syslog_lib:get_pid(Pid),
-    gen_event:Fun(?MODULE, {log, os:timestamp(), Severity, PidStr, Msg}).
+    SeverityInt = map_severity(Severity),
+    gen_event:Fun(?MODULE, {log, os:timestamp(), SeverityInt, PidStr, Msg}).
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -142,3 +143,18 @@ get_fun() -> ets:lookup_element(?MODULE, function, 2).
 set_fun(sync,  State) -> set_fun(sync_notify), State;
 set_fun(async, State) -> set_fun(notify), State.
 set_fun(Fun)          -> true = ets:insert(?MODULE, {function, Fun}).
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Note that `crash' is fake severity which will be `error' after the final
+%% translation in `syslog_logger_h'.
+%%------------------------------------------------------------------------------
+map_severity(emergency)     -> ?SYSLOG_EMERGENCY;
+map_severity(alert)         -> ?SYSLOG_ALERT;
+map_severity(critical)      -> ?SYSLOG_CRITICAL;
+map_severity(error)         -> ?SYSLOG_ERROR;
+map_severity(warning)       -> ?SYSLOG_WARNING;
+map_severity(notice)        -> ?SYSLOG_NOTICE;
+map_severity(informational) -> ?SYSLOG_INFO;
+map_severity(debug)         -> ?SYSLOG_DEBUG;
+map_severity(crash)         -> ?SYSLOG_CRASH.

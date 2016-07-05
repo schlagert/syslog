@@ -35,6 +35,20 @@
           msg       :: binary()}).
 
 %%%=============================================================================
+%%% Defines for severity integer values.
+%%%=============================================================================
+
+-define(SYSLOG_EMERGENCY, 0).
+-define(SYSLOG_ALERT, 1).
+-define(SYSLOG_CRITICAL, 2).
+-define(SYSLOG_ERROR, 3).
+-define(SYSLOG_WARNING, 4).
+-define(SYSLOG_NOTICE, 5).
+-define(SYSLOG_INFO, 6).
+-define(SYSLOG_DEBUG, 7).
+-define(SYSLOG_CRASH, 8).
+
+%%%=============================================================================
 %%% Define for application internal error logging.
 %%%=============================================================================
 

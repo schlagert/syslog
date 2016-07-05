@@ -174,9 +174,13 @@ get_bom(_)          -> <<>>.
 
 %%------------------------------------------------------------------------------
 %% @private
+%% Identifies the facility to use, everything with severity `crash' goes into
+%% the `crash_facility' which may or may not be equal to the standard facility.
 %%------------------------------------------------------------------------------
-severity_to_facility(crash, #state{crash_facility = F}) -> map_facility(F);
-severity_to_facility(_,     #state{facility = F})       -> map_facility(F).
+severity_to_facility(?SYSLOG_CRASH, #state{crash_facility = F}) ->
+    map_facility(F);
+severity_to_facility(_, #state{facility = F}) ->
+    map_facility(F).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -208,13 +212,9 @@ map_facility(local7)   -> 23.
 
 %%------------------------------------------------------------------------------
 %% @private
+%% Translate the fake `crash' severity back to `error'. The `crash' severity is
+%% only used to be able to select the appropriate facility, e.g. the
+%% `crash_facility' (see `severity_to_facility/2').
 %%------------------------------------------------------------------------------
-map_severity(emergency)     -> 0;
-map_severity(alert)         -> 1;
-map_severity(critical)      -> 2;
-map_severity(error)         -> 3;
-map_severity(warning)       -> 4;
-map_severity(notice)        -> 5;
-map_severity(informational) -> 6;
-map_severity(debug)         -> 7;
-map_severity(crash)         -> 3.
+map_severity(?SYSLOG_CRASH) -> ?SYSLOG_ERROR;
+map_severity(Unmapped)      -> Unmapped.

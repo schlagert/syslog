@@ -55,6 +55,10 @@ rfc3164_test() ->
     Re5 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - world",
     ?assertMatch({match, _}, re:run(read(Socket), Re5)),
 
+    ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
+    Re6 = "<131>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re6)),
+
     teardown(Socket).
 
 rfc5424_test() ->
@@ -84,6 +88,10 @@ rfc5424_test() ->
     Re5 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - world",
     ?assertMatch({match, _}, re:run(read(Socket), Re5)),
 
+    ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
+    Re6 = "<131>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re6)),
+
     teardown(Socket).
 
 %%%=============================================================================
@@ -97,6 +105,7 @@ setup(Protocol) ->
     ?assertEqual(ok, load(AppSpec)),
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
+    ?assertEqual(ok, application:set_env(syslog, crash_facility, local0)),
     ?assertEqual(ok, application:start(syslog)),
     ?assertEqual(ok, empty_mailbox()),
     gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]).
@@ -106,6 +115,7 @@ teardown(Socket) ->
     application:stop(sasl),
     application:unset_env(syslog, dest_port),
     application:unset_env(syslog, protocol),
+    application:unset_env(syslog, crash_facility),
     gen_udp:close(Socket).
 
 load(App) -> load(App, application:load(App)).
