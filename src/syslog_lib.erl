@@ -72,15 +72,19 @@ get_domain(Hostname) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns the name part of the running node. If the node is not running in
-%% distributed mode (no nodename configured) the string `"beam"' will be
-%% returned.
+%% Returns the name reported in the `APP-NAME' field. If no name is configured
+%% using the application environment, name part of the running node is returned.
+%% If the node is not running in distributed mode (no nodename configured) the
+%% string `"beam"' will be returned.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_name() -> string().
-get_name()                -> get_name(atom_to_list(node())).
-get_name("nonode@nohost") -> "beam";
-get_name(Node)            -> hd(string:tokens(Node, "@")).
+get_name() ->
+    case ?GET_ENV(app_name) of
+        {ok, Name} when is_list(Name) -> Name;
+        {ok, Name} when is_atom(Name) -> atom_to_list(Name);
+        undefined                     -> get_name_from_node(node())
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -112,6 +116,15 @@ get_pid(P) when is_pid(P) ->
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_name_from_node(Node) ->
+    case atom_to_list(Node) of
+        "nonode@nohost" -> "beam";
+        N               -> hd(string:tokens(N, "@"))
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -178,10 +191,10 @@ get_domain_test() ->
     ?assertEqual("domain",    get_domain("host.domain")),
     ?assertEqual("domain.de", get_domain("host.domain.de")).
 
-get_name_test() ->
-    ?assertEqual("beam",     get_name("nonode@nohost")),
-    ?assertEqual("nodename", get_name("nodename@hostname")),
-    ?assertEqual("nodename", get_name("nodename@hostname.dom.ain")).
+get_name_from_node_test() ->
+    ?assertEqual("beam",     get_name_from_node('nonode@nohost')),
+    ?assertEqual("nodename", get_name_from_node('nodename@hostname')),
+    ?assertEqual("nodename", get_name_from_node('nodename@hostname.dom.ain')).
 
 get_pid_test() ->
     ?assertEqual("init", get_pid(init)),

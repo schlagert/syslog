@@ -110,7 +110,14 @@ are available and can be configured in the application environment:
   output. So if you you don't care when a new process is started, set this
   flag to `true`. Default is `false`.
 
-* `{async_limit, pos_integer()}`:
+* `{app_name, atom() | list()}`
+
+  Configured the value reported in the `APP-NAME` field of Syslog messages. If
+  not set (the default), the name part of the node name will be used. If the
+  node is not alive (not running in distributed mode) the string `beam` will be
+  used.
+
+* `{async_limit, pos_integer()}`
 
   Specifies the number of entries in the `syslog_logger` message queue to which
   asynchronous logging is allowed. As long as the message queue does not exceed
@@ -194,7 +201,8 @@ History
 
 ### Master
 
-* Development, currently no difference to version 2.0.1.
+* Add `app_name` configuration directive to allow configuration of the
+  `APP-NAME` field value (thanks to @comtihon).
 
 ### Version 2.0.1
 
