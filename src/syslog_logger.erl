@@ -50,6 +50,9 @@
 -include("syslog.hrl").
 
 -define(ASYNC_LIMIT, 30).
+-define(LOG_LEVEL,   debug).
+
+-record(opts, {function :: notify | sync_notify, log_level :: 0..7}).
 
 %%%=============================================================================
 %%% API
@@ -73,25 +76,32 @@ start_link() ->
 %%------------------------------------------------------------------------------
 -spec msg(syslog:severity(), pid() | atom(), binary()) -> ok.
 msg(Severity, Pid, Msg) ->
-    Fun = get_fun(),
-    PidStr = syslog_lib:get_pid(Pid),
-    SeverityInt = map_severity(Severity),
-    gen_event:Fun(?MODULE, {log, os:timestamp(), SeverityInt, PidStr, Msg}).
+    #opts{function = Fun, log_level = Level} = get_opts(),
+    case map_severity(Severity) of
+        SeverityInt when SeverityInt =< Level ->
+            PidStr = syslog_lib:get_pid(Pid),
+            Timestamp = os:timestamp(),
+            gen_event:Fun(?MODULE, {log, Timestamp, SeverityInt, PidStr, Msg});
+        _ ->
+            ok
+    end.
 
 %%%=============================================================================
 %%% gen_event callbacks
 %%%=============================================================================
 
 -record(state, {
-          async = true  :: boolean(),
-          async_limit   :: pos_integer() | infinity}).
+          async = true :: boolean(),
+          log_level    :: 0..7,
+          async_limit  :: pos_integer() | infinity}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
-    AsyncLimit = syslog_lib:get_property(async_limit, ?ASYNC_LIMIT),
-    {ok, set_fun(async, #state{async_limit = erlang:max(1, AsyncLimit)})}.
+    Limit = erlang:max(1, syslog_lib:get_property(async_limit, ?ASYNC_LIMIT)),
+    Level = map_severity(syslog_lib:get_property(log_level, ?LOG_LEVEL)),
+    {ok, set_opts(async, #state{async_limit = Limit, log_level = Level})}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -101,9 +111,9 @@ handle_event({log, _, _, _, _}, State = #state{async_limit = AsyncLimit})
     {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
     case {QueueLen > AsyncLimit, State#state.async} of
         {true, true} ->
-            {ok, set_fun(sync, State#state{async = false})};
+            {ok, set_opts(sync, State#state{async = false})};
         {false, false} ->
-            {ok, set_fun(async, State#state{async = true})};
+            {ok, set_opts(async, State#state{async = true})};
         _ ->
             {ok, State}
     end;
@@ -137,20 +147,26 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_fun() -> ets:lookup_element(?MODULE, function, 2).
+-spec get_opts() -> #opts{}.
+get_opts() -> ets:lookup_element(?MODULE, opts, 2).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-set_fun(sync,  State) -> set_fun(sync_notify), State;
-set_fun(async, State) -> set_fun(notify), State.
-set_fun(Fun)          -> true = ets:insert(?MODULE, {function, Fun}).
+set_opts(sync, State) ->
+    set_opts(sync_notify, State);
+set_opts(async, State) ->
+    set_opts(notify, State);
+set_opts(Fun, State = #state{log_level = Level}) ->
+    true = ets:insert(?MODULE, {opts, #opts{function = Fun, log_level = Level}}),
+    State.
 
 %%------------------------------------------------------------------------------
 %% @private
 %% Note that `crash' is fake severity which will be `error' after the final
 %% translation in `syslog_logger_h'.
 %%------------------------------------------------------------------------------
+map_severity(crash)         -> ?SYSLOG_CRASH;
 map_severity(emergency)     -> ?SYSLOG_EMERGENCY;
 map_severity(alert)         -> ?SYSLOG_ALERT;
 map_severity(critical)      -> ?SYSLOG_CRITICAL;
@@ -158,5 +174,4 @@ map_severity(error)         -> ?SYSLOG_ERROR;
 map_severity(warning)       -> ?SYSLOG_WARNING;
 map_severity(notice)        -> ?SYSLOG_NOTICE;
 map_severity(informational) -> ?SYSLOG_INFO;
-map_severity(debug)         -> ?SYSLOG_DEBUG;
-map_severity(crash)         -> ?SYSLOG_CRASH.
+map_severity(debug)         -> ?SYSLOG_DEBUG.

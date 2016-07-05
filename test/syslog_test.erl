@@ -28,7 +28,7 @@
 %%%=============================================================================
 
 rfc3164_test() ->
-    {ok, Socket} = setup(rfc3164),
+    {ok, Socket} = setup(rfc3164, debug),
 
     Pid = pid_to_list(self()),
     Month = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
@@ -62,7 +62,7 @@ rfc3164_test() ->
     teardown(Socket).
 
 rfc5424_test() ->
-    {ok, Socket} = setup(rfc5424),
+    {ok, Socket} = setup(rfc5424, debug),
 
     Pid = pid_to_list(self()),
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
@@ -94,11 +94,20 @@ rfc5424_test() ->
 
     teardown(Socket).
 
+log_level_test() ->
+    {ok, Socket} = setup(rfc5424, notice),
+
+    ?assertEqual(ok, syslog:debug_msg("hello world")),
+    ?assertEqual(ok, syslog:info_msg("hello world")),
+    ?assertEqual(timeout, read(Socket)),
+
+    teardown(Socket).
+
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
 
-setup(Protocol) ->
+setup(Protocol, LogLevel) ->
     ?assertEqual(ok, application:start(sasl)),
     AppFile = filename:join(["..", "src", "syslog.app.src"]),
     {ok, [AppSpec]} = file:consult(AppFile),
@@ -106,9 +115,10 @@ setup(Protocol) ->
     ?assertEqual(ok, application:set_env(syslog, dest_port, ?TEST_PORT)),
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
     ?assertEqual(ok, application:set_env(syslog, crash_facility, local0)),
+    ?assertEqual(ok, application:set_env(syslog, log_level, LogLevel)),
     ?assertEqual(ok, application:start(syslog)),
     ?assertEqual(ok, empty_mailbox()),
-    gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]).
+    gen_udp:open(?TEST_PORT, [binary]).
 
 teardown(Socket) ->
     application:stop(syslog),
@@ -116,12 +126,18 @@ teardown(Socket) ->
     application:unset_env(syslog, dest_port),
     application:unset_env(syslog, protocol),
     application:unset_env(syslog, crash_facility),
+    application:unset_env(syslog, log_level),
     gen_udp:close(Socket).
 
 load(App) -> load(App, application:load(App)).
 load(_, ok) -> ok;
 load(App, {error, {already_loaded, App}}) -> ok.
 
-read(Socket) -> receive {udp, Socket, _, _, Bin} -> binary_to_list(Bin) end.
+read(Socket) ->
+    receive
+        {udp, Socket, _, _, Bin} -> binary_to_list(Bin)
+    after
+        500 -> timeout
+    end.
 
 empty_mailbox() -> receive _ -> empty_mailbox() after ?TIMEOUT -> ok end.

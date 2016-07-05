@@ -117,6 +117,12 @@ are available and can be configured in the application environment:
   node is not alive (not running in distributed mode) the string `beam` will be
   used.
 
+* `{log_level, syslog:severity()}`
+
+  Configures the minimal log level. All messages with a severity value smaller
+  then the configured level will be discarded. Default is `debug` (discard
+  nothing).
+
 * `{async_limit, pos_integer() | infinity}`
 
   Specifies the number of entries in the `syslog_logger` message queue to which
@@ -206,6 +212,9 @@ History
   `async_limit` to `infinity` (thanks to @comtihon).
 * Change severity of messages sent by `error_logger:info_[msg|report]/1,2` and
   `syslog:info_msg/1,2` from `notice` to `informational` (thanks to @comtihon).
+* Add `log_level` configuration directive. With this configuration it is
+  possible to discard messages with undesired severity values (thanks to
+  @comtihon).
 
 ### Version 2.0.1
 
