@@ -81,7 +81,7 @@ msg(Severity, Pid, Msg) ->
 
 -record(state, {
           async = true  :: boolean(),
-          async_limit   :: pos_integer()}).
+          async_limit   :: pos_integer() | infinity}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -93,7 +93,8 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, _, _, _, _}, State = #state{async_limit = AsyncLimit}) ->
+handle_event({log, _, _, _, _}, State = #state{async_limit = AsyncLimit})
+  when AsyncLimit =/= infinity ->
     {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
     case {QueueLen > AsyncLimit, State#state.async} of
         {true, true} ->

@@ -117,7 +117,7 @@ are available and can be configured in the application environment:
   node is not alive (not running in distributed mode) the string `beam` will be
   used.
 
-* `{async_limit, pos_integer()}`
+* `{async_limit, pos_integer() | infinity}`
 
   Specifies the number of entries in the `syslog_logger` message queue to which
   asynchronous logging is allowed. As long as the message queue does not exceed
@@ -125,12 +125,11 @@ are available and can be configured in the application environment:
   length exceeds this limit all logging statements will be synchronous, blocking
   the calling process until the logging request was processed. Default is `30`.
 
-If your application really needs fast asynchronous logging and doesn't care
-about lost log messages, logging should be done using the `error_logger` API and
-the `syslog` application should be configured so that
-`async_limit > msg_queue_limit`. This should prevent `syslog` from switching to
-synchronous mode as well as limiting the `error_logger` message queue to a
-reasonable size.
+If your application really needs fast asynchronous logging and you like to live
+dangerously, logging should be done using the `error_logger` API and the
+`syslog` application should be configured with `{async_limit, infinity}`. This
+should prevent `syslog` from switching to synchronous mode and all message
+queues are allowed to grow indefinitely.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It
@@ -203,6 +202,8 @@ History
 
 * Add `app_name` configuration directive to allow configuration of the
   `APP-NAME` field value (thanks to @comtihon).
+* Add ability to disable switching to synchronous logging by setting
+  `async_limit` to `infinity` (thanks to @comtihon).
 
 ### Version 2.0.1
 
