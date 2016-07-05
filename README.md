@@ -204,6 +204,8 @@ History
   `APP-NAME` field value (thanks to @comtihon).
 * Add ability to disable switching to synchronous logging by setting
   `async_limit` to `infinity` (thanks to @comtihon).
+* Change severity of messages sent by `error_logger:info_[msg|report]/1,2` and
+  `syslog:info_msg/1,2` from `notice` to `informational` (thanks to @comtihon).
 
 ### Version 2.0.1
 

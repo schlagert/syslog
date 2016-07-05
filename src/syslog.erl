@@ -82,7 +82,7 @@ debug_msg(Msg) -> debug_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Sends a format message with severity `notice'. This function never fails.
+%% Sends a format message with severity `debug'. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
 -spec debug_msg(string(), [term()]) -> ok.
@@ -90,8 +90,8 @@ debug_msg(Fmt, Args) -> msg(debug, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Sends a message with severity `notice'. Like the `error_logger' counterpart
-%% this function never fails.
+%% Sends a message with severity `informational'. Like the `error_logger'
+%% counterpart this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
 -spec info_msg(string()) -> ok.
@@ -99,12 +99,12 @@ info_msg(Msg) -> info_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Sends a format message with severity `notice'. Like the `error_logger'
+%% Sends a format message with severity `informational'. Like the `error_logger'
 %% counterpart this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
 -spec info_msg(string(), [term()]) -> ok.
-info_msg(Fmt, Args) -> msg(notice, Fmt, Args).
+info_msg(Fmt, Args) -> msg(informational, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

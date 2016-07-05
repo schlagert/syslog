@@ -141,9 +141,9 @@ handle_msg({warning_msg, _, {Pid, Fmt, Args}}, State) ->
 handle_msg({warning_report, _, {Pid, Type, Report}}, State) ->
     log_report(warning, Pid, Type, Report, State);
 handle_msg({info_msg, _, {Pid, Fmt, Args}}, State) ->
-    log_msg(notice, Pid, Fmt, Args, State);
+    log_msg(informational, Pid, Fmt, Args, State);
 handle_msg({info_report, _, {Pid, Type, Report}}, State) ->
-    log_report(notice, Pid, Type, Report, State);
+    log_report(informational, Pid, Type, Report, State);
 handle_msg(_, State) ->
     State.
 

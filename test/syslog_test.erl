@@ -35,7 +35,7 @@ rfc3164_test() ->
     Date = Month ++ " (\\s|\\d)\\d \\d\\d:\\d\\d:\\d\\d",
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<29>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
+    Re1 = "<30>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
@@ -64,7 +64,7 @@ rfc5424_test() ->
     Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<29>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
     ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
