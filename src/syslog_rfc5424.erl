@@ -52,7 +52,7 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
      $\s,
      truncate(48, Report#syslog_report.appname),
      $\s,
-     truncate(12, Report#syslog_report.beam_pid),
+     truncate(128, Report#syslog_report.beam_pid),
      $\s,
      truncate(32, Report#syslog_report.pid),
      $\s,
