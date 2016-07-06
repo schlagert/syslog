@@ -38,7 +38,8 @@
          error_msg/1,
          error_msg/2,
          msg/3,
-         msg/4]).
+         msg/4,
+         set_log_level/1]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -164,6 +165,14 @@ msg(Severity, Pid, Fmt, Args) ->
     catch
         C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Set the log level to the given value.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_log_level(severity()) -> ok | {error, term()}.
+set_log_level(Level) -> syslog_logger:set_log_level(Level).
 
 %%%=============================================================================
 %%% Application callbacks

@@ -37,7 +37,8 @@
 
 %% API
 -export([start_link/0,
-         msg/3]).
+         msg/3,
+         set_log_level/1]).
 
 %% gen_event callbacks
 -export([init/1,
@@ -50,7 +51,6 @@
 -include("syslog.hrl").
 
 -define(ASYNC_LIMIT, 30).
--define(LOG_LEVEL,   debug).
 
 -record(opts, {function :: notify | sync_notify, log_level :: 0..7}).
 
@@ -74,17 +74,25 @@ start_link() ->
 %% Forwards a log message to all registered gen_event handlers.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(syslog:severity(), pid() | atom(), binary()) -> ok.
+-spec msg(syslog:severity(), pid() | atom() | string(), binary()) -> ok.
 msg(Severity, Pid, Msg) ->
     #opts{function = Fun, log_level = Level} = get_opts(),
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
-            PidStr = syslog_lib:get_pid(Pid),
             Timestamp = os:timestamp(),
+            PidStr = syslog_lib:get_pid(Pid),
             gen_event:Fun(?MODULE, {log, Timestamp, SeverityInt, PidStr, Msg});
         _ ->
             ok
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Set the log level to the given value.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_log_level(syslog:severity()) -> ok | {error, term()}.
+set_log_level(Level) -> gen_event:call(?MODULE, ?MODULE, {set_level, Level}).
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -100,8 +108,8 @@ msg(Severity, Pid, Msg) ->
 %%------------------------------------------------------------------------------
 init(_Arg) ->
     Limit = erlang:max(1, syslog_lib:get_property(async_limit, ?ASYNC_LIMIT)),
-    Level = map_severity(syslog_lib:get_property(log_level, ?LOG_LEVEL)),
-    {ok, set_opts(async, #state{async_limit = Limit, log_level = Level})}.
+    Level = map_severity(syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)),
+    {ok, set_opts(#state{async_limit = Limit, log_level = Level})}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -111,9 +119,9 @@ handle_event({log, _, _, _, _}, State = #state{async_limit = AsyncLimit})
     {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
     case {QueueLen > AsyncLimit, State#state.async} of
         {true, true} ->
-            {ok, set_opts(sync, State#state{async = false})};
+            {ok, set_opts(State#state{async = false})};
         {false, false} ->
-            {ok, set_opts(async, State#state{async = true})};
+            {ok, set_opts(State#state{async = true})};
         _ ->
             {ok, State}
     end;
@@ -123,7 +131,17 @@ handle_event(_, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_call(_Request, State) -> {ok, undef, State}.
+handle_call({set_level, Level}, State = #state{log_level = OldLevel}) ->
+    case catch map_severity(Level) of
+        I when is_integer(I), Level =/= OldLevel ->
+            {ok, ok, set_opts(State#state{log_level = I})};
+        I when is_integer(I) ->
+            {ok, ok, State};
+        _ ->
+            {ok, {error, {bad_log_level, Level}}, State}
+    end;
+handle_call(_Request, State) ->
+    {ok, undef, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -153,10 +171,10 @@ get_opts() -> ets:lookup_element(?MODULE, opts, 2).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-set_opts(sync, State) ->
+set_opts(State = #state{async = false}) ->
     set_opts(sync_notify, State);
-set_opts(async, State) ->
-    set_opts(notify, State);
+set_opts(State = #state{async = true}) ->
+    set_opts(notify, State).
 set_opts(Fun, State = #state{log_level = Level}) ->
     true = ets:insert(?MODULE, {opts, #opts{function = Fun, log_level = Level}}),
     State.

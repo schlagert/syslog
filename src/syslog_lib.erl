@@ -104,7 +104,9 @@ get_property_(_, Value)         -> Value.
 %% (locally) registered name of the process or its process id.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_pid(pid() | atom()) -> string().
+-spec get_pid(pid() | atom() | string()) -> string().
+get_pid(N) when is_list(N) ->
+    N;
 get_pid(N) when is_atom(N) ->
     atom_to_list(N);
 get_pid(P) when is_pid(P) ->

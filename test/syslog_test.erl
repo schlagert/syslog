@@ -97,9 +97,18 @@ rfc5424_test() ->
 log_level_test() ->
     {ok, Socket} = setup(rfc5424, notice),
 
+    Pid = pid_to_list(self()),
+    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
+
     ?assertEqual(ok, syslog:debug_msg("hello world")),
     ?assertEqual(ok, syslog:info_msg("hello world")),
     ?assertEqual(timeout, read(Socket)),
+
+    ?assertEqual(ok, syslog:set_log_level(debug)),
+
+    ?assertEqual(ok, syslog:debug_msg("hello world")),
+    Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
     teardown(Socket).
 

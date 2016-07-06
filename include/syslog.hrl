@@ -55,9 +55,10 @@
 -define(ERR(Fmt, Args), io:format(standard_error, Fmt, Args)).
 
 %%%=============================================================================
-%%% Defines the default Syslog facility.
+%%% Defines the default Syslog facility and log level.
 %%%=============================================================================
 
 -define(SYSLOG_FACILITY, daemon).
+-define(SYSLOG_LOGLEVEL, debug).
 
 -endif. %% syslog_hrl_
