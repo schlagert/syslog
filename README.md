@@ -40,6 +40,7 @@ Features
   configurable).
 * Throughput optimization by dynamically switching from synchronous to
   asynchronous mode.
+* Built-in `lager` backend to bridge between both frameworks.
 
 Planned
 -------
@@ -167,6 +168,15 @@ provided by the `syslog` module. These functions are similar to the ones
 provided by the `error_logger` module and should feel familiar (see the
 `*msg/1,2` functions).
 
+The `syslog` application comes with a built-in, optional backend for `lager`.
+This is especially useful if your release has dependencies that require `lager`
+although you wish to forward logging using `syslog` only. To forward `lager`
+logging into `syslog` you can use something like the following in your
+`sys.config`:
+```erlang
+{lager, [{handlers, [{syslog_lager_backend, []}]}]}
+```
+
 Performance
 -----------
 
@@ -215,6 +225,7 @@ History
 * Add `log_level` configuration directive. With this configuration it is
   possible to discard messages with undesired severity values (thanks to
   @comtihon).
+* Add optional `lager` backend to forward messages from `lager` to `syslog`.
 
 ### Version 2.0.1
 
