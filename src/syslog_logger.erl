@@ -75,12 +75,12 @@ start_link() ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec msg(syslog:severity(), pid() | atom() | string(), binary()) -> ok.
-msg(Severity, Pid, Msg) ->
+msg(Severity, PidOrName, Msg) ->
     #opts{function = Fun, log_level = Level} = get_opts(),
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
             Timestamp = os:timestamp(),
-            PidStr = syslog_lib:get_pid(Pid),
+            PidStr = syslog_lib:get_pid(PidOrName),
             gen_event:Fun(?MODULE, {log, Timestamp, SeverityInt, PidStr, Msg});
         _ ->
             ok

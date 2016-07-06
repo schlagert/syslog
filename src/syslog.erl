@@ -39,6 +39,7 @@
          error_msg/2,
          msg/3,
          msg/4,
+         forward_msg/3,
          set_log_level/1]).
 
 %% Application callbacks
@@ -148,9 +149,8 @@ error_msg(Fmt, Args) -> msg(error, Fmt, Args).
 %% Logs a format message with a specific severity. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(severity(), string() | pid(), [term()] | binary()) -> ok.
-msg(Severity, Fmt, Args) when is_list(Fmt)  -> msg(Severity, self(), Fmt, Args);
-msg(Severity, Pid, Msg) when is_binary(Msg) -> forward_msg(Severity, Pid, Msg).
+-spec msg(severity(), string(), [term()]) -> ok.
+msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -164,6 +164,20 @@ msg(Severity, Pid, Fmt, Args) ->
         forward_msg(Severity, Pid, iolist_to_binary(io_lib:format(Fmt, Args)))
     catch
         C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Forwards a pre-formatted message directly to the `syslog_logger'. This is
+%% mainly used internally (e.g. by `syslog_error_h'). This function never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec forward_msg(severity(), pid() | atom() | string(), binary()) -> ok.
+forward_msg(Severity, PidOrName, Msg) ->
+    try
+        syslog_logger:msg(Severity, PidOrName, Msg)
+    catch
+        _:_ -> ?ERR("~s~n", [Msg])
     end.
 
 %%------------------------------------------------------------------------------
@@ -225,13 +239,3 @@ event_mgr(M) -> spec(M, dynamic).
 %% @private
 %%------------------------------------------------------------------------------
 spec(M, Ms) -> {M, {M, start_link, []}, transient, brutal_kill, worker, Ms}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-forward_msg(Severity, Pid, Msg) ->
-    try
-        syslog_logger:msg(Severity, Pid, Msg)
-    catch
-        _:_ -> ?ERR("~s~n", [Msg])
-    end.
