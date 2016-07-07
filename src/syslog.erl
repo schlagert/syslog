@@ -39,7 +39,7 @@
          error_msg/2,
          msg/3,
          msg/4,
-         forward_msg/3,
+         forward_msg/4,
          set_log_level/1]).
 
 %% Application callbacks
@@ -66,7 +66,12 @@
                   {verbose, true | {false, Depth :: pos_integer()}} |
                   {no_progress, boolean()}.
 
--export_type([facility/0, severity/0, option/0]).
+-type proc_name() :: atom() | pid() | string().
+
+-export_type([facility/0,
+              severity/0,
+              option/0,
+              proc_name/0]).
 
 -include("syslog.hrl").
 
@@ -158,10 +163,12 @@ msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 %% function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(severity(), pid(), string(), [term()]) -> ok.
+-spec msg(severity(), proc_name(), string(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
+    Timestamp = os:timestamp(),
     try
-        forward_msg(Severity, Pid, iolist_to_binary(io_lib:format(Fmt, Args)))
+        Msg = iolist_to_binary(io_lib:format(Fmt, Args)),
+        forward_msg(Severity, Pid, Timestamp, Msg)
     catch
         C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
     end.
@@ -169,13 +176,14 @@ msg(Severity, Pid, Fmt, Args) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Forwards a pre-formatted message directly to the `syslog_logger'. This is
-%% mainly used internally (e.g. by `syslog_error_h'). This function never fails.
+%% mainly used internally (e.g. by `syslog_error_h' or `syslog_lager_backend').
+%% This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec forward_msg(severity(), pid() | atom() | string(), binary()) -> ok.
-forward_msg(Severity, PidOrName, Msg) ->
+-spec forward_msg(severity(), proc_name(), erlang:timestamp(), binary()) -> ok.
+forward_msg(Severity, Pid, Timestamp, Msg) ->
     try
-        syslog_logger:msg(Severity, PidOrName, Msg)
+        syslog_logger:msg(Severity, Pid, Timestamp, Msg)
     catch
         _:_ -> ?ERR("~s~n", [Msg])
     end.

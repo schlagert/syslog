@@ -183,10 +183,11 @@ log_report(_, Pid, progress, Report, State = #state{verbose = {false, D}}) ->
     Mfargs = proplists:get_value(mfargs, Details),
     log_msg(informational, Pid, "started child ~s with ~P", [Child, Mfargs, D], State);
 log_report(_, Pid, supervisor_report, Report, State) ->
-    Time = calendar:now_to_local_time(os:timestamp()),
+    Timestamp = os:timestamp(),
+    Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
     Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
-    syslog:forward_msg(crash, Pid, Msg),
+    syslog:forward_msg(crash, Pid, Timestamp, Msg),
     State;
 log_report(Severity, Pid, _, Report, State = #state{verbose = true}) ->
     log_msg(Severity, Pid, "~p", [Report], State);
@@ -197,10 +198,11 @@ log_report(Severity, Pid, _, Report, State = #state{verbose = {false, D}}) ->
 %% @private
 %%------------------------------------------------------------------------------
 log_crash(false, Pid, Report, State) ->
-    Time = calendar:now_to_local_time(os:timestamp()),
+    Timestamp = os:timestamp(),
+    Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
     Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
-    syslog:forward_msg(crash, Pid, Msg),
+    syslog:forward_msg(crash, Pid, Timestamp, Msg),
     State;
 log_crash(true, Pid, Report = [SubReport | _], State) ->
     NewState = log_crash(false, Pid, Report, State),

@@ -61,14 +61,16 @@ init([Level]) -> {ok, #state{log_level = level_to_mask(Level)}}.
 %%------------------------------------------------------------------------------
 handle_event({log, Level, _, [_, Location, Message]}, State)
   when Level =< State#state.log_level ->
+    Timestamp = os:timestamp(),
     Binary = iolist_to_binary(Message),
-    syslog:forward_msg(get_severity(Level), get_pid(Location), Binary),
+    syslog:forward_msg(get_severity(Level), get_pid(Location), Timestamp, Binary),
     {ok, State};
 handle_event({log, Msg}, State = #state{log_level = Level}) ->
     case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
         true ->
+            Timestamp = apply(lager_msg, timestamp, [Msg]),
             Binary = iolist_to_binary(?FORMAT(Msg)),
-            syslog:forward_msg(get_severity(Msg), get_pid(Msg), Binary);
+            syslog_logger:msg(get_severity(Msg), get_pid(Msg), Timestamp, Binary);
         false ->
             ok
     end,

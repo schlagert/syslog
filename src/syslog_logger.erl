@@ -37,7 +37,7 @@
 
 %% API
 -export([start_link/0,
-         msg/3,
+         msg/4,
          set_log_level/1]).
 
 %% gen_event callbacks
@@ -74,13 +74,15 @@ start_link() ->
 %% Forwards a log message to all registered gen_event handlers.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(syslog:severity(), pid() | atom() | string(), binary()) -> ok.
-msg(Severity, PidOrName, Msg) ->
+-spec msg(syslog:severity(),
+          syslog:proc_name(),
+          erlang:timestamp(),
+          binary()) -> ok.
+msg(Severity, Pid, Timestamp, Msg) ->
     #opts{function = Fun, log_level = Level} = get_opts(),
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
-            Timestamp = os:timestamp(),
-            PidStr = syslog_lib:get_pid(PidOrName),
+            PidStr = syslog_lib:get_pid(Pid),
             gen_event:Fun(?MODULE, {log, Timestamp, SeverityInt, PidStr, Msg});
         _ ->
             ok
