@@ -65,7 +65,7 @@ rfc5424_test() ->
     {ok, Socket} = setup(rfc5424, debug),
 
     Pid = pid_to_list(self()),
-    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
+    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d(Z|(\\+|-)\\d\\d:\\d\\d)",
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
@@ -98,7 +98,7 @@ log_level_test() ->
     {ok, Socket} = setup(rfc5424, notice),
 
     Pid = pid_to_list(self()),
-    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d.\\d\\d\\d\\d\\d\\dZ",
+    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d(Z|(\\+|-)\\d\\d:\\d\\d)",
 
     ?assertEqual(ok, syslog:debug_msg("hello world")),
     ?assertEqual(ok, syslog:info_msg("hello world")),

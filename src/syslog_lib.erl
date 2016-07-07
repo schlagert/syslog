@@ -26,7 +26,8 @@
          get_name/0,
          get_property/2,
          get_pid/1,
-         get_utc_datetime/1]).
+         get_utc_datetime/1,
+         get_utc_offset/2]).
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
 
@@ -126,6 +127,20 @@ get_utc_datetime({MegaSecs, Secs, MicroSecs}) ->
     Datetime = calendar:now_to_universal_time({MegaSecs, Secs, 0}),
     {Datetime, MicroSecs}.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the offset of a local datetime from the given UTC datetime.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_utc_offset(calendar:datetime(), calendar:datetime()) ->
+                            {43 | 45, 0..23, 0..59}.
+get_utc_offset(Utc, Local) when Utc < Local ->
+    {0, {H, Mi, 0}} = time_difference(Utc, Local),
+    {$+, H, Mi};
+get_utc_offset(Utc, Local) ->
+    {0, {H, Mi, 0}} = time_difference(Local, Utc),
+    {$-, H, Mi}.
+
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
@@ -181,6 +196,14 @@ ntoa(IPv4) -> lists:flatten(io_lib:format("~w.~w.~w.~w", tuple_to_list(IPv4))).
 %% @private
 %%------------------------------------------------------------------------------
 is_ip4(Str) -> re:run(Str, "\\d+.\\d+.\\d+.\\d+", [{capture, none}]) =:= match.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+time_difference(T1, T2) ->
+    calendar:seconds_to_daystime(
+      calendar:datetime_to_gregorian_seconds(T2) -
+          calendar:datetime_to_gregorian_seconds(T1)).
 
 %%%=============================================================================
 %%% TESTS

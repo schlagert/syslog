@@ -69,11 +69,17 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_date(#syslog_report{datetime = {Datetime, MicroSecs}}) ->
-    get_date(Datetime, MicroSecs).
-get_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
-    [integer_to_list(Y), "-", digit(Mo), "-", digit(D), "T",
-     digit(H), ":", digit(Mi), ":", digit(S), ".", micro(Micro), "Z"].
+get_date(#syslog_report{datetime = {UtcDatetime, MicroSecs}}) ->
+    LocaDatetime = erlang:universaltime_to_localtime(UtcDatetime),
+    get_date(LocaDatetime, UtcDatetime, MicroSecs).
+get_date(Utc = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
+    [integer_to_list(Y), $-, digit(Mo), $-, digit(D), $T,
+     digit(H), $:, digit(Mi), $:, digit(S), $., micro(Micro), $Z];
+get_date(Local = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
+    {Sign, OH, OMi} = syslog_lib:get_utc_offset(Utc, Local),
+    [integer_to_list(Y), $-, digit(Mo), $-, digit(D), $T,
+     digit(H), $:, digit(Mi), $:, digit(S), $., micro(Micro),
+     Sign, digit(OH), $:, digit(OMi)].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -116,7 +122,8 @@ truncate(L, S)                     -> string:substr(S, 1, L).
 
 get_date_test() ->
     R = #syslog_report{datetime = {{{2013,4,6},{21,20,56}},908235}},
-    ?assertEqual("2013-04-06T21:20:56.908235Z", lists:flatten(get_date(R))).
+    Rx = "2013-04-06T\\d\\d:\\d\\d:56\\.908235(Z|(\\+|-)\\d\\d:\\d\\d)",
+    ?assertMatch({match, _}, re:run(lists:flatten(get_date(R)), Rx)).
 
 truncate_test() ->
     ?assertEqual("",    truncate(0, "")),

@@ -67,7 +67,7 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 get_date(#syslog_report{datetime = {UtcDatetime, _MicroSecs}}) ->
     get_date(erlang:universaltime_to_localtime(UtcDatetime));
 get_date({{_, Mo, D}, {H, Mi, S}}) ->
-    [month(Mo), " ", day(D), " ", digit(H), ":", digit(Mi), ":", digit(S)].
+    [month(Mo), " ", day(D), " ", digit(H), $:, digit(Mi), $:, digit(S)].
 
 %%------------------------------------------------------------------------------
 %% @private
