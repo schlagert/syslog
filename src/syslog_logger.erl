@@ -83,7 +83,8 @@ msg(Severity, Pid, Timestamp, Msg) ->
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
             PidStr = syslog_lib:get_pid(Pid),
-            gen_event:Fun(?MODULE, {log, Timestamp, SeverityInt, PidStr, Msg});
+            Datetime = syslog_lib:get_utc_datetime(Timestamp),
+            gen_event:Fun(?MODULE, {log, Datetime, SeverityInt, PidStr, Msg});
         _ ->
             ok
     end.

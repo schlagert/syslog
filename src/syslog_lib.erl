@@ -25,7 +25,8 @@
          get_domain/0,
          get_name/0,
          get_property/2,
-         get_pid/1]).
+         get_pid/1,
+         get_utc_datetime/1]).
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
 
@@ -114,6 +115,16 @@ get_pid(P) when is_pid(P) ->
         {registered_name, N} -> atom_to_list(N);
         _                    -> pid_to_list(P)
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns a syslog datetime object (UTC) with microsecond resolution.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_utc_datetime(erlang:timestamp()) -> syslog:datetime().
+get_utc_datetime({MegaSecs, Secs, MicroSecs}) ->
+    Datetime = calendar:now_to_universal_time({MegaSecs, Secs, 0}),
+    {Datetime, MicroSecs}.
 
 %%%=============================================================================
 %%% internal functions

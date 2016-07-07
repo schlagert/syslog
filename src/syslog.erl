@@ -68,10 +68,13 @@
 
 -type proc_name() :: atom() | pid() | string().
 
+-type datetime() :: {calendar:datetime(), non_neg_integer()}.
+
 -export_type([facility/0,
               severity/0,
               option/0,
-              proc_name/0]).
+              proc_name/0,
+              datetime/0]).
 
 -include("syslog.hrl").
 

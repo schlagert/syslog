@@ -23,16 +23,16 @@
 %%%=============================================================================
 
 -record(syslog_report, {
-          severity  :: 0..7,
-          facility  :: 0..23,
-          timestamp :: erlang:timestamp(),
-          hostname  :: string(),
-          domain    :: string(),
-          appname   :: string(),
-          beam_pid  :: string(),
-          pid       :: string(),
-          bom       :: binary(),
-          msg       :: binary()}).
+          severity :: 0..7,
+          facility :: 0..23,
+          datetime :: syslog:datetime(), %% UTC
+          hostname :: string(),
+          domain   :: string(),
+          appname  :: string(),
+          beam_pid :: string(),
+          pid      :: string(),
+          bom      :: binary(),
+          msg      :: binary()}).
 
 %%%=============================================================================
 %%% Defines for severity integer values.

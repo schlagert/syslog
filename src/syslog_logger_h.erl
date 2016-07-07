@@ -93,8 +93,8 @@ init(_Arg) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, Timestamp, Severity, Pid, Msg}, State) ->
-    {ok, send(get_report(Timestamp, Severity, Pid, Msg, State), State)};
+handle_event({log, Datetime, Severity, Pid, Msg}, State) ->
+    {ok, send(get_report(Datetime, Severity, Pid, Msg, State), State)};
 handle_event(_, State) ->
     {ok, State}.
 
@@ -126,18 +126,18 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_report(Timestamp, Severity, Pid, Msg, State) ->
+get_report(Datetime, Severity, Pid, Msg, State) ->
     #syslog_report{
-       severity  = map_severity(Severity),
-       facility  = severity_to_facility(Severity, State),
-       timestamp = Timestamp,
-       pid       = Pid,
-       hostname  = State#state.hostname,
-       domain    = State#state.domain,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       bom       = State#state.bom,
-       msg       = Msg}.
+       severity = map_severity(Severity),
+       facility = severity_to_facility(Severity, State),
+       datetime = Datetime,
+       pid      = Pid,
+       hostname = State#state.hostname,
+       domain   = State#state.domain,
+       appname  = State#state.appname,
+       beam_pid = State#state.beam_pid,
+       bom      = State#state.bom,
+       msg      = Msg}.
 
 %%------------------------------------------------------------------------------
 %% @private

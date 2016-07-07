@@ -69,8 +69,8 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
-    get_date(calendar:now_to_universal_time({MegaSecs, Secs, 0}), MicroSecs).
+get_date(#syslog_report{datetime = {Datetime, MicroSecs}}) ->
+    get_date(Datetime, MicroSecs).
 get_date({{Y, Mo, D}, {H, Mi, S}}, Micro) ->
     [integer_to_list(Y), "-", digit(Mo), "-", digit(D), "T",
      digit(H), ":", digit(Mi), ":", digit(S), ".", micro(Micro), "Z"].
@@ -115,7 +115,7 @@ truncate(L, S)                     -> string:substr(S, 1, L).
 -include_lib("eunit/include/eunit.hrl").
 
 get_date_test() ->
-    R = #syslog_report{timestamp = {1365,283256,908235}},
+    R = #syslog_report{datetime = {{{2013,4,6},{21,20,56}},908235}},
     ?assertEqual("2013-04-06T21:20:56.908235Z", lists:flatten(get_date(R))).
 
 truncate_test() ->

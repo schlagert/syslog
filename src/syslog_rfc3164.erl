@@ -64,8 +64,8 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_date(#syslog_report{timestamp = {MegaSecs, Secs, MicroSecs}}) ->
-    get_date(calendar:now_to_local_time({MegaSecs, Secs, MicroSecs}));
+get_date(#syslog_report{datetime = {UtcDatetime, _MicroSecs}}) ->
+    get_date(erlang:universaltime_to_localtime(UtcDatetime));
 get_date({{_, Mo, D}, {H, Mi, S}}) ->
     [month(Mo), " ", day(D), " ", digit(H), ":", digit(Mi), ":", digit(S)].
 
@@ -133,7 +133,7 @@ digit(N)  -> integer_to_list(N).
 -include_lib("eunit/include/eunit.hrl").
 
 get_date_test() ->
-    R = #syslog_report{timestamp = {1365,283256,908235}},
+    R = #syslog_report{datetime = {{{2013,4,6},{21,20,56}},908235}},
     Rx = "Apr  6 \\d\\d:20:56",
     ?assertMatch({match, _}, re:run(lists:flatten(get_date(R)), Rx)).
 
@@ -146,7 +146,7 @@ get_hostname_test() ->
 to_iolist_test() ->
     R = #syslog_report{severity = 5,
 		       facility = 20,
-		       timestamp = {1365,283256,908235},
+		       datetime = {{{2013,4,6},{21,20,56}},908235},
 		       hostname = "host.domain.com",
 		       domain = "domain.com",
 		       appname = "beam",
