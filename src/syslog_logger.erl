@@ -37,7 +37,8 @@
 
 %% API
 -export([start_link/0,
-         msg/4,
+         maybe_log/4,
+         maybe_log/5,
          set_log_level/1]).
 
 %% gen_event callbacks
@@ -71,20 +72,47 @@ start_link() ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Forwards a log message to all registered gen_event handlers.
+%% Forwards a pre-formatted message directly to all registered gen_event
+%% handlers. This is mainly used internally (e.g. by `syslog_error_h' or
+%% `syslog_lager_backend'). This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(syslog:severity(),
-          syslog:proc_name(),
-          erlang:timestamp(),
-          binary()) -> ok.
-msg(Severity, Pid, Timestamp, Msg) ->
-    #opts{function = Fun, log_level = Level} = get_opts(),
+-spec maybe_log(syslog:severity(),
+                syslog:proc_name(),
+                erlang:timestamp(),
+                iodata()) -> ok.
+maybe_log(Severity, Pid, Timestamp, Message) ->
+    Opts = #opts{log_level = Level} = get_opts(),
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
-            PidStr = syslog_lib:get_pid(Pid),
-            Datetime = syslog_lib:get_utc_datetime(Timestamp),
-            gen_event:Fun(?MODULE, {log, Datetime, SeverityInt, PidStr, Msg});
+            Msg = iolist_to_binary(Message),
+            forward(SeverityInt, Pid, Timestamp, Msg, Opts);
+        _ ->
+            ok
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Forwards a format message directly to all registered gen_event handlers. This
+%% function never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec maybe_log(syslog:severity(),
+                syslog:proc_name(),
+                erlang:timestamp(),
+                string(),
+                [term()]) -> ok.
+maybe_log(Severity, Pid, Timestamp, Fmt, Args) ->
+    Opts = #opts{log_level = Level} = get_opts(),
+    case map_severity(Severity) of
+        SeverityInt when SeverityInt =< Level ->
+            try
+                Msg = iolist_to_binary(io_lib:format(Fmt, Args)),
+                forward(SeverityInt, Pid, Timestamp, Msg, Opts)
+            catch
+                C:E -> ?ERR("io_lib:format(~p,~p) failed (~p:~p)~n",
+                            [Fmt, Args, C, E])
+            end;
         _ ->
             ok
     end.
@@ -168,8 +196,20 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+forward(SeverityInt, Pid, Timestamp, Msg, #opts{function = Fun}) ->
+    try
+        PidStr = syslog_lib:get_pid(Pid),
+        Datetime = syslog_lib:get_utc_datetime(Timestamp),
+        gen_event:Fun(?MODULE, {log, Datetime, SeverityInt, PidStr, Msg})
+    catch
+        _:_ -> ?ERR("~s~n", [Msg])
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 -spec get_opts() -> #opts{}.
-get_opts() -> ets:lookup_element(?MODULE, opts, 2).
+get_opts() -> hd(ets:lookup(?MODULE, opts)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -179,13 +219,13 @@ set_opts(State = #state{async = false}) ->
 set_opts(State = #state{async = true}) ->
     set_opts(notify, State).
 set_opts(Fun, State = #state{log_level = Level}) ->
-    true = ets:insert(?MODULE, {opts, #opts{function = Fun, log_level = Level}}),
+    true = ets:insert(?MODULE, #opts{function = Fun, log_level = Level}),
     State.
 
 %%------------------------------------------------------------------------------
 %% @private
-%% Note that `crash' is fake severity which will be `error' after the final
-%% translation in `syslog_logger_h'.
+%% Note that `crash' is a fake severity which will become `error' after the
+%% final translation in `syslog_logger_h'.
 %%------------------------------------------------------------------------------
 map_severity(crash)         -> ?SYSLOG_CRASH;
 map_severity(emergency)     -> ?SYSLOG_EMERGENCY;

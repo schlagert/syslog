@@ -186,8 +186,8 @@ log_report(_, Pid, supervisor_report, Report, State) ->
     Timestamp = os:timestamp(),
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
-    Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
-    syslog:forward_msg(crash, Pid, Timestamp, Msg),
+    Msg = sasl_report:format_report(fd, all, Event),
+    syslog_logger:maybe_log(crash, Pid, Timestamp, Msg),
     State;
 log_report(Severity, Pid, _, Report, State = #state{verbose = true}) ->
     log_msg(Severity, Pid, "~p", [Report], State);
@@ -201,8 +201,8 @@ log_crash(false, Pid, Report, State) ->
     Timestamp = os:timestamp(),
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
-    Msg = iolist_to_binary(sasl_report:format_report(fd, all, Event)),
-    syslog:forward_msg(crash, Pid, Timestamp, Msg),
+    Msg = sasl_report:format_report(fd, all, Event),
+    syslog_logger:maybe_log(crash, Pid, Timestamp, Msg),
     State;
 log_crash(true, Pid, Report = [SubReport | _], State) ->
     NewState = log_crash(false, Pid, Report, State),

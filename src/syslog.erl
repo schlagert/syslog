@@ -39,7 +39,6 @@
          error_msg/2,
          msg/3,
          msg/4,
-         forward_msg/4,
          set_log_level/1]).
 
 %% Application callbacks
@@ -168,28 +167,7 @@ msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 %%------------------------------------------------------------------------------
 -spec msg(severity(), proc_name(), string(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
-    Timestamp = os:timestamp(),
-    try
-        Msg = iolist_to_binary(io_lib:format(Fmt, Args)),
-        forward_msg(Severity, Pid, Timestamp, Msg)
-    catch
-        C:E -> ?ERR("io_lib:format(~p, ~p) failed (~p:~p)~n", [Fmt, Args, C, E])
-    end.
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Forwards a pre-formatted message directly to the `syslog_logger'. This is
-%% mainly used internally (e.g. by `syslog_error_h' or `syslog_lager_backend').
-%% This function never fails.
-%% @end
-%%------------------------------------------------------------------------------
--spec forward_msg(severity(), proc_name(), erlang:timestamp(), binary()) -> ok.
-forward_msg(Severity, Pid, Timestamp, Msg) ->
-    try
-        syslog_logger:msg(Severity, Pid, Timestamp, Msg)
-    catch
-        _:_ -> ?ERR("~s~n", [Msg])
-    end.
+    syslog_logger:maybe_log(Severity, Pid, os:timestamp(), Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

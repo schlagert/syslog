@@ -42,7 +42,6 @@
 -include("syslog.hrl").
 
 -define(CFG, [message]).
--define(FORMAT(Msg), apply(lager_default_formatter, format, [Msg, ?CFG])).
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -61,16 +60,17 @@ init([Level]) -> {ok, #state{log_level = level_to_mask(Level)}}.
 %%------------------------------------------------------------------------------
 handle_event({log, Level, _, [_, Location, Message]}, State)
   when Level =< State#state.log_level ->
+    Severity = get_severity(Level),
     Timestamp = os:timestamp(),
-    Binary = iolist_to_binary(Message),
-    syslog:forward_msg(get_severity(Level), get_pid(Location), Timestamp, Binary),
+    syslog_logger:maybe_log(Severity, get_pid(Location), Timestamp, Message),
     {ok, State};
 handle_event({log, Msg}, State = #state{log_level = Level}) ->
     case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
         true ->
+            Severity = get_severity(Msg),
             Timestamp = apply(lager_msg, timestamp, [Msg]),
-            Binary = iolist_to_binary(?FORMAT(Msg)),
-            syslog_logger:msg(get_severity(Msg), get_pid(Msg), Timestamp, Binary);
+            Message = apply(lager_default_formatter, format, [Msg, ?CFG]),
+            syslog_logger:maybe_log(Severity, get_pid(Msg), Timestamp, Message);
         false ->
             ok
     end,
