@@ -18,7 +18,8 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% A benchmarking escript to test different logging frameworks.
+%%% A benchmarking escript to test different logging frameworks. Simulates a
+%%% burst of large log statements.
 %%%
 %%% The test spams messages from a configurable number of processes over a
 %%% configurable amount of time. The number of messages sent will be reported
@@ -33,26 +34,35 @@
 -mode(compile).
 -compile([export_all]).
 
+-behaviour(gen_event).
 -define(TEST_PORT, 31337).
--define(FMT, "~p").
+
+%% ~ 14*60=840bytes (roughly) of delicious garbage
+-define(FMT,
+        "~s~w~p"
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+        "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"
+        "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
+        "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+        "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllll"
+        "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+        "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn").
 -define(ARGS,
-	[%% 840bytes of garbage
-	 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-	 "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-	 "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-	 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-	 "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
-	 "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
-	 "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"
-	 "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
-	 "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
-	 "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll"
-	 ]).
+        [
+         %% ~s adds nothing
+         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         %% ~w converts to [98,98,...] => 19*3+2=59Chars
+         "bbbbbbbbbbbbbbbbbbb",
+         %% ~p adds two '"'
+         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ]).
 
 -define(LAGER,       "https://github.com/basho/lager.git").
--define(LOG4ERL,     "https://github.com/schlagert/log4erl.git").
+-define(LOG4ERL,     "https://github.com/ahmednawras/log4erl.git").
 -define(SASL_SYSLOG, "https://github.com/travelping/sasl_syslog.git").
 
 %%%=============================================================================
@@ -103,7 +113,7 @@ setup(NumberOfProcesses, MilliSeconds) ->
     ok = application:load(sasl),
     ok = application:set_env(sasl, sasl_error_logger, false),
     {ok, _} = application:ensure_all_started(sasl),
-    {ok, Socket} = gen_udp:open(?TEST_PORT, [binary, {reuseaddr, true}]),
+    {ok, Socket} = gen_udp:open(?TEST_PORT, [binary]),
     {NumProcs, Millis, Socket}.
 
 %%------------------------------------------------------------------------------
@@ -139,15 +149,11 @@ lager(NumProcs, Millis, Socket) ->
     {ok, Paths} = setup_app(lager, pwd(), ?LAGER),
     ok = application:set_env(lager, async_threshold, 30),
     ok = application:set_env(lager, error_logger_redirect, true),
-    ok = application:set_env(lager, handlers, [{lager_console_backend, info}]),
+    ok = application:set_env(lager, handlers, [{?MODULE, []}]),
     {ok, Started} = application:ensure_all_started(lager),
-    UserPid = whereis(user),
-    true = unregister(user),
-    true = register(user, self()),
+    timer:sleep(1000),
     LogFun = fun() -> ok = lager:log(info, self(), ?FMT, ?ARGS) end,
     ok = run_app(lager, LogFun, NumProcs, Millis, Socket),
-    true = unregister(user),
-    true = register(user, UserPid),
     teardown_app(Started, Paths).
 
 %%------------------------------------------------------------------------------
@@ -205,8 +211,8 @@ report_statistics(App, NumSent, NumReceived, Memory, Duration) ->
     NumSentPerSecond = NumSent * 1000 div Duration,
     io:format(
       "  Total Messages Sent:      ~p~n"
-      "  Total Messagtes Received: ~p~n"
-      "  Total Messagtes Dropped:  ~p~n"
+      "  Total Messages Received:  ~p~n"
+      "  Total Messages Dropped:   ~p~n"
       "  Total Duration:           ~pms~n"
       "  Messages Sent Per Second: ~p~n"
       "  Peak Memory Used:         ~pMB~n",
@@ -280,11 +286,6 @@ process_messages(Sock, Left, Memory, NumSent, NumReceived) ->
             process_messages(Sock, Left, NewMemory, NumSent, NumReceived + 1);
         {udp_closed, Sock} ->
             exit({error, udp_closed});
-        {io_request, F, A, {put_chars, unicode, M}} ->
-            %% everyone else must do the socket IO, console loggers should
-            %% at least fake this here
-            F ! {io_reply, A, gen_udp:send(Sock, "localhost", ?TEST_PORT, M)},
-            process_messages(Sock, Left, NewMemory, NumSent, NumReceived);
         _ ->
             process_messages(Sock, Left, NewMemory, NumSent, NumReceived)
     after 5000 ->
@@ -344,3 +345,53 @@ current_millis() ->
     MegaSecs * 1000000 + Secs * 1000 + MicroSecs div 1000.
 current_millis(OffsetMillis) ->
     current_millis() + OffsetMillis.
+
+%%%=============================================================================
+%%% gen_event callbacks
+%%%=============================================================================
+
+-record(state, {socket = inet:socket(), log_level :: term()}).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+init([]) ->
+    {ok, S} = gen_udp:open(0, [binary]),
+    L = lager_util:config_to_mask(info),
+    {ok, #state{socket = S, log_level = L}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_call(get_loglevel, State = #state{log_level = L}) -> {ok, L, State};
+handle_call(_Request, State)                             -> {ok, ok, State}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_event({log, Msg}, State = #state{socket = S, log_level = L}) ->
+    case lager_util:is_loggable(Msg, L, ?MODULE) of
+        true ->
+            IOList = lager_default_formatter:format(Msg, []),
+            ok = gen_udp:send(S, "localhost", ?TEST_PORT, IOList);
+        false ->
+            ok
+    end,
+    {ok, State};
+handle_event(_Event, State) ->
+    {ok, State}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_info(_Info, State) -> {ok, State}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+terminate(_Arg, #state{socket = Socket}) -> gen_udp:close(Socket).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
