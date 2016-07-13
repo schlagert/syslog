@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -42,9 +42,9 @@
 -define(REGISTRATIONS,
         [
          %% Manager      Handler
-         {error_logger,  syslog_error_h},
          {syslog_logger, syslog_logger},
-         {syslog_logger, syslog_logger_h}
+         {syslog_logger, syslog_logger_h},
+         {error_logger,  syslog_error_h}
         ]).
 
 -include("syslog.hrl").

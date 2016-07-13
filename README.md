@@ -40,6 +40,8 @@ Features
   configurable).
 * Throughput optimization by dynamically switching from synchronous to
   asynchronous mode.
+* Load distribution between all concurrently logging processes by moving the
+  message formatting into the calling process(es).
 * Built-in `lager` backend to bridge between both frameworks.
 
 Planned
@@ -226,6 +228,9 @@ History
   possible to discard messages with undesired severity values (thanks to
   @comtihon).
 * Add optional `lager` backend to forward messages from `lager` to `syslog`.
+* Further improvement of robustness, especially when many processes try to
+  log concurrently by moving the message formatting away from the main event
+  manager into the logging processes.
 
 ### Version 2.0.1
 

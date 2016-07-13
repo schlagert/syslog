@@ -1,6 +1,6 @@
 %%%=============================================================================
 %%% Copyright 2011, Travelping GmbH <info@travelping.com>
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -20,10 +20,10 @@
 %%%=============================================================================
 -module(syslog_rfc5424).
 
--behaviour(syslog_logger_h).
+-behaviour(syslog_logger).
 
 %% API
--export([to_iolist/1]).
+-export([hdr/3, msg/2]).
 
 -include("syslog.hrl").
 
@@ -35,32 +35,29 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns an `iolist' containing an RFC5424 compliant syslog report.
+%% Format the HDR part of RFC 5424 excluding the PRI, including structured
+%% elements.
 %% @end
 %%------------------------------------------------------------------------------
--spec to_iolist(#syslog_report{}) -> iolist().
-to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
+-spec hdr(syslog:datetime(), string(), #syslog_cfg{}) -> iodata().
+hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
     [
-     $<,
-     integer_to_list((F bsl 3) + S),
-     $>,
-     ?VERSION,
-     $\s,
-     get_date(Report),
-     $\s,
-     truncate(255, Report#syslog_report.hostname),
-     $\s,
-     truncate(48, Report#syslog_report.appname),
-     $\s,
-     truncate(128, Report#syslog_report.beam_pid),
-     $\s,
-     truncate(32, Report#syslog_report.pid),
-     $\s,
-     $-,
-     $\s,
-     Report#syslog_report.bom,
-     unicode:characters_to_binary(Report#syslog_report.msg)
+     ?VERSION, $\s,
+     get_date(Datetime), $\s,
+     truncate(255, H), $\s,
+     truncate(48, A), $\s,
+     truncate(128, B), $\s,
+     truncate(32, Pid), $\s, $-, $\s
     ].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Format the MSG part of RFC 5424.
+%% @end
+%%------------------------------------------------------------------------------
+-spec msg(binary(), #syslog_cfg{}) -> iodata().
+msg(Msg, #syslog_cfg{bom = Bom}) ->
+    unicode:characters_to_binary([Bom, Msg]).
 
 %%%=============================================================================
 %%% internal functions
@@ -69,7 +66,7 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_date(#syslog_report{datetime = {UtcDatetime, MicroSecs}}) ->
+get_date({UtcDatetime, MicroSecs}) ->
     LocaDatetime = erlang:universaltime_to_localtime(UtcDatetime),
     get_date(LocaDatetime, UtcDatetime, MicroSecs).
 get_date(Utc = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
@@ -121,9 +118,9 @@ truncate(L, S)                     -> string:substr(S, 1, L).
 -include_lib("eunit/include/eunit.hrl").
 
 get_date_test() ->
-    R = #syslog_report{datetime = {{{2013,4,6},{21,20,56}},908235}},
+    Datetime = {{{2013,4,6},{21,20,56}},908235},
     Rx = "2013-04-06T\\d\\d:\\d\\d:56\\.908235(Z|(\\+|-)\\d\\d:\\d\\d)",
-    ?assertMatch({match, _}, re:run(lists:flatten(get_date(R)), Rx)).
+    ?assertMatch({match, _}, re:run(lists:flatten(get_date(Datetime)), Rx)).
 
 truncate_test() ->
     ?assertEqual("",    truncate(0, "")),

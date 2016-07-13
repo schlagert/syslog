@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -14,16 +14,10 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% The event handler to be attached to the {@link syslog_logger} event manager.
-%%% This handler will convert the incoming messages to `syslog_report's which
-%%% will then be converted to Syslog packets using the configured protocol
-%%% backend and finally send the binaries over the wire.
-%%%
-%%% Protocol backends must implement the {@link syslog_error_h} behaviour.
+%%% A simple event handler that sends incoming `iodata()' to a configured
+%%% destination.
 %%%
 %%% @see syslog_monitor
-%%% @see syslog_rfc3164
-%%% @see syslog_rfc5424
 %%% @end
 %%%=============================================================================
 -module(syslog_logger_h).
@@ -38,39 +32,17 @@
          terminate/2,
          code_change/3]).
 
--include("syslog.hrl").
-
 -define(DEST_HOST, {127, 0, 0, 1}).
 -define(DEST_PORT, 514).
--define(FACILITY,  ?SYSLOG_FACILITY).
--define(PROTOCOL,  rfc3164).
-
-%%%=============================================================================
-%%% callback definitions
-%%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% This is the behaviour that must be implemented by protocol backends.
-%%------------------------------------------------------------------------------
-
--callback to_iolist(#syslog_report{}) -> iolist().
 
 %%%=============================================================================
 %%% gen_event callbacks
 %%%=============================================================================
 
 -record(state, {
-          socket          :: inet:socket(),
-          protocol        :: module(),
-          facility        :: syslog:facility(),
-          crash_facility  :: syslog:facility(),
-          dest_host       :: inet:ip_address() | inet:hostname(),
-          dest_port       :: inet:port_number(),
-          hostname        :: string(),
-          domain          :: string(),
-          appname         :: string(),
-          beam_pid        :: string(),
-          bom             :: binary()}).
+          socket    :: inet:socket(),
+          dest_host :: inet:ip_address() | inet:hostname(),
+          dest_port :: inet:port_number()}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -78,25 +50,15 @@
 init(_Arg) ->
     {ok, Socket} = gen_udp:open(0, [binary]),
     {ok, #state{
-            socket          = Socket,
-            protocol        = get_protocol(),
-            facility        = syslog_lib:get_property(facility, ?FACILITY),
-            crash_facility  = syslog_lib:get_property(crash_facility, ?FACILITY),
-            dest_host       = syslog_lib:get_property(dest_host, ?DEST_HOST),
-            dest_port       = syslog_lib:get_property(dest_port, ?DEST_PORT),
-            hostname        = syslog_lib:get_hostname(),
-            domain          = syslog_lib:get_domain(),
-            appname         = syslog_lib:get_name(),
-            beam_pid        = os:getpid(),
-            bom             = get_bom()}}.
+            socket = Socket,
+            dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST),
+            dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT)}}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, Datetime, Severity, Pid, Msg}, State) ->
-    {ok, send(get_report(Datetime, Severity, Pid, Msg, State), State)};
-handle_event(_, State) ->
-    {ok, State}.
+handle_event({log, Msg}, State) -> {ok, send(Msg, State)};
+handle_event(_, State)          -> {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -126,100 +88,6 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_report(Datetime, Severity, Pid, Msg, State) ->
-    #syslog_report{
-       severity = map_severity(Severity),
-       facility = severity_to_facility(Severity, State),
-       datetime = Datetime,
-       pid      = Pid,
-       hostname = State#state.hostname,
-       domain   = State#state.domain,
-       appname  = State#state.appname,
-       beam_pid = State#state.beam_pid,
-       bom      = State#state.bom,
-       msg      = Msg}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-send(Report, State = #state{protocol = Protocol}) ->
-    [send_datagram(Protocol:to_iolist(R), State) || R <- split(Report)],
+send(Data, State = #state{socket = S, dest_host = H, dest_port = P}) ->
+    ok = gen_udp:send(S, H, P, Data),
     State.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-send_datagram(Data, #state{socket = S, dest_host = H, dest_port = P}) ->
-    ok = gen_udp:send(S, H, P, Data).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-split(R = #syslog_report{msg = Msg}) ->
-    [R#syslog_report{msg = Line} || Line <- split_impl(Msg), Line =/= <<>>].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-split_impl(Bin) when is_binary(Bin) -> binary:split(Bin, <<"\n">>, [global]).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_protocol()        -> get_protocol(syslog_lib:get_property(protocol, ?PROTOCOL)).
-get_protocol(rfc5424) -> syslog_rfc5424;
-get_protocol(rfc3164) -> syslog_rfc3164.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_bom()           -> get_bom(syslog_lib:get_property(use_rfc5424_bom, false)).
-get_bom({ok, true}) -> unicode:encoding_to_bom(utf8);
-get_bom(_)          -> <<>>.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% Identifies the facility to use, everything with severity `crash' goes into
-%% the `crash_facility' which may or may not be equal to the standard facility.
-%%------------------------------------------------------------------------------
-severity_to_facility(?SYSLOG_CRASH, #state{crash_facility = F}) ->
-    map_facility(F);
-severity_to_facility(_, #state{facility = F}) ->
-    map_facility(F).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-map_facility(kernel)   -> 0;
-map_facility(kern)     -> 0;
-map_facility(mail)     -> 2;
-map_facility(daemon)   -> 3;
-map_facility(auth)     -> 4;
-map_facility(syslog)   -> 5;
-map_facility(lpr)      -> 6;
-map_facility(news)     -> 7;
-map_facility(uucp)     -> 8;
-map_facility(cron)     -> 9;
-map_facility(authpriv) -> 10;
-map_facility(ftp)      -> 11;
-map_facility(ntp)      -> 12;
-map_facility(logaudit) -> 13;
-map_facility(logalert) -> 14;
-map_facility(clock)    -> 15;
-map_facility(local0)   -> 16;
-map_facility(local1)   -> 17;
-map_facility(local2)   -> 18;
-map_facility(local3)   -> 19;
-map_facility(local4)   -> 20;
-map_facility(local5)   -> 21;
-map_facility(local6)   -> 22;
-map_facility(local7)   -> 23.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% Translate the fake `crash' severity back to `error'. The `crash' severity is
-%% only used to be able to select the appropriate facility, e.g. the
-%% `crash_facility' (see `severity_to_facility/2').
-%%------------------------------------------------------------------------------
-map_severity(?SYSLOG_CRASH) -> ?SYSLOG_ERROR;
-map_severity(Unmapped)      -> Unmapped.

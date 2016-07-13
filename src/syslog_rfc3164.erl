@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -19,10 +19,10 @@
 %%%=============================================================================
 -module(syslog_rfc3164).
 
--behaviour(syslog_logger_h).
+-behaviour(syslog_logger).
 
 %% API
--export([to_iolist/1]).
+-export([hdr/3, msg/2]).
 
 -include("syslog.hrl").
 
@@ -32,30 +32,25 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns an `iolist' containing an RFC3164 compliant syslog report.
+%% Format the HDR part of RFC 3164 excluding the PRI.
 %% @end
 %%------------------------------------------------------------------------------
--spec to_iolist(#syslog_report{}) -> iolist().
-to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
+-spec hdr(syslog:datetime(), string(), #syslog_cfg{}) -> iodata().
+hdr(Datetime, Pid, Cfg = #syslog_cfg{appname = A, beam_pid = B}) ->
     [
-     $<,
-     integer_to_list((F bsl 3) + S),
-     $>,
-     get_date(Report),
-     $\s,
-     get_hostname(Report),
-     $\s,
-     Report#syslog_report.appname,
-     $[,
-     Report#syslog_report.beam_pid,
-     $],
-     $\s,
-     Report#syslog_report.pid,
-     $\s,
-     $-,
-     $\s,
-     Report#syslog_report.msg
+     get_date(Datetime), $\s,
+     get_hostname(Cfg), $\s,
+     A, $[, B, $], $\s,
+     Pid, $\s, $-, $\s
     ].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Format the MSG part of RFC 3164. Basically a noop.
+%% @end
+%%------------------------------------------------------------------------------
+-spec msg(binary(), #syslog_cfg{}) -> iodata().
+msg(Msg, _Cfg) -> Msg.
 
 %%%=============================================================================
 %%% internal functions
@@ -64,15 +59,19 @@ to_iolist(Report = #syslog_report{facility = F, severity = S}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_date(#syslog_report{datetime = {UtcDatetime, _MicroSecs}}) ->
-    get_date(erlang:universaltime_to_localtime(UtcDatetime));
-get_date({{_, Mo, D}, {H, Mi, S}}) ->
+get_date({UtcDatetime, _MicroSecs}) ->
+    format_date(erlang:universaltime_to_localtime(UtcDatetime)).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+format_date({{_, Mo, D}, {H, Mi, S}}) ->
     [month(Mo), " ", day(D), " ", digit(H), $:, digit(Mi), $:, digit(S)].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_hostname(#syslog_report{hostname = H, domain = D}) ->
+get_hostname(#syslog_cfg{hostname = H, domain = D}) ->
     get_hostname(H, string:rstr(H, [$. | D])).
 get_hostname(Hostname, Occurence) when Occurence > 2 ->
     string:sub_string(Hostname, 1, Occurence - 1);
@@ -133,28 +132,27 @@ digit(N)  -> integer_to_list(N).
 -include_lib("eunit/include/eunit.hrl").
 
 get_date_test() ->
-    R = #syslog_report{datetime = {{{2013,4,6},{21,20,56}},908235}},
+    Datetime = {{{2013,4,6},{21,20,56}},908235},
     Rx = "Apr  6 \\d\\d:20:56",
-    ?assertMatch({match, _}, re:run(lists:flatten(get_date(R)), Rx)).
+    ?assertMatch({match, _}, re:run(lists:flatten(get_date(Datetime)), Rx)).
 
 get_hostname_test() ->
-    R1 = #syslog_report{hostname = "host.domain.com", domain = "domain.com"},
+    R1 = #syslog_cfg{hostname = "host.domain.com", domain = "domain.com"},
     ?assertEqual("host", get_hostname(R1)),
-    R2 = #syslog_report{hostname = "host", domain = ""},
+    R2 = #syslog_cfg{hostname = "host", domain = ""},
     ?assertEqual("host", get_hostname(R2)).
 
-to_iolist_test() ->
-    R = #syslog_report{severity = 5,
-		       facility = 20,
-		       datetime = {{{2013,4,6},{21,20,56}},908235},
-		       hostname = "host.domain.com",
-		       domain = "domain.com",
-		       appname = "beam",
-		       beam_pid = "12345",
-		       pid = "init",
-		       msg = "info goes here"},
-    Rx = "<165>Apr  6 \\d\\d:20:56 host beam\\[12345\\] init - info goes here",
-    Actual = binary_to_list(iolist_to_binary(to_iolist(R))),
+hdr_test() ->
+    Datetime = {{{2013,4,6},{21,20,56}},908235},
+    Pid = "init",
+    Cfg = #syslog_cfg{hostname = "host.domain.com",
+                      domain = "domain.com",
+                      appname = "beam",
+                      beam_pid = "12345"},
+    Rx = <<"Apr  6 \\d\\d:20:56 host beam\\[12345\\] init - ">>,
+    Actual = iolist_to_binary(hdr(Datetime, Pid, Cfg)),
     ?assertMatch({match, _}, re:run(Actual, Rx)).
+
+msg_test() -> ?assertEqual(<<"info">>, msg(<<"info">>, #syslog_cfg{})).
 
 -endif.

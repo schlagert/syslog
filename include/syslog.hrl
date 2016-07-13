@@ -1,6 +1,6 @@
 %%%=============================================================================
 %%% Copyright 2011, Travelping GmbH <info@travelping.com>
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -19,20 +19,15 @@
 -define(syslog_hrl_, 1).
 
 %%%=============================================================================
-%%% The syslog report record.
+%%% The syslog static configuration.
 %%%=============================================================================
 
--record(syslog_report, {
-          severity :: 0..7,
-          facility :: 0..23,
-          datetime :: syslog:datetime(), %% UTC
+-record(syslog_cfg, {
           hostname :: string(),
           domain   :: string(),
           appname  :: string(),
           beam_pid :: string(),
-          pid      :: string(),
-          bom      :: binary(),
-          msg      :: binary()}).
+          bom      :: binary()}).
 
 %%%=============================================================================
 %%% Defines for severity integer values.
