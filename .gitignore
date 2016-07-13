@@ -2,6 +2,8 @@
 *.dat
 *.o
 *.plt
+*.png
+*.svg
 .eunit
 .rebar
 benchmark/lager

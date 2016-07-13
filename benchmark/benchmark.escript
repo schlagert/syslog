@@ -38,7 +38,7 @@
 -define(TEST_PORT, 31337).
 
 %% ~ 14*60=840bytes (roughly) of delicious garbage
--define(FMT,
+-define(LARGE_FMT,
         "~s~w~p"
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
@@ -51,15 +51,32 @@
         "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllll"
         "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
         "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn").
--define(ARGS,
+-define(LARGE_ARGS,
         [
          %% ~s adds nothing
          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-         %% ~w converts to [98,98,...] => 19*3+2=59Chars
+         %% ~w converts to [98,98,...] => 18*3+2+2=58Chars
          "bbbbbbbbbbbbbbbbbbb",
          %% ~p adds two '"'
          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         ]).
+
+%% ~ 5*8=40bytes (roughly) of delicious garbage
+-define(SMALL_FMT,
+        "~s~w~p"
+        "dddddddd"
+        "eeeeeeee").
+-define(SMALL_ARGS,
+        [
+         %% ~s adds nothing
+         "aaaaaaaa",
+         %% ~w converts to [98,98] => 1*3+2+2=7Chars
+         "bb",
+         %% ~p adds two '"'
+         "cccccc"
+        ]).
+
+-define(BENCHMARK_DAT(Type), "benchmark-" ++ Type ++ ".dat").
 
 -define(LAGER,       "https://github.com/basho/lager.git").
 -define(LOG4ERL,     "https://github.com/ahmednawras/log4erl.git").
@@ -72,25 +89,30 @@
 main([]) ->
     io:format(
       "Usage:~n~n"
-      "  ~s all|lager|log4erl|sasl_syslog|syslog [Processes] [Millis]~n~n"
-      "      Processes - Number of processes used (default 1)~n"
-      "      Millis    - Duration of spamming in millis (default 2000)~n~n",
+      "  ~s all|lager|log4erl|sasl_syslog|syslog [MessageType] [Processes] [Millis]~n~n"
+      "      MessageType - Use large or small messages (default large)"
+      "      Processes   - Number of processes used (default 1)~n"
+      "      Millis      - Duration of spamming in millis (default 2000)~n~n",
       [escript:script_name()]);
 main([App]) ->
-    main([App, "1"]);
-main([App, NumberOfProcesses]) ->
-    main([App, NumberOfProcesses, "2000"]);
-main(["all", NumberOfProcesses, MilliSeconds]) ->
+    main([App, "large"]);
+main([App, MessageType]) ->
+    main([App, MessageType, "1"]);
+main([App, MessageType, NumberOfProcesses]) ->
+    main([App, MessageType, NumberOfProcesses, "2000"]);
+main(["all", MessageType, NumberOfProcesses, MilliSeconds]) ->
     {NumProcs, Millis, Socket} = setup(NumberOfProcesses, MilliSeconds),
-    lager(NumProcs, Millis, Socket),
-    log4erl(NumProcs, Millis, Socket),
-    syslog(NumProcs, Millis, Socket),
-    %% This is likely to fail or at least take damn long
-    sasl_syslog(NumProcs, Millis, Socket),
+    {File, Fmt, Args} = get_fmt_args(MessageType),
+    io:format("  Profile:                  ~s~n", [MessageType]),
+    lager(File, NumProcs, Millis, Socket, Fmt, Args),
+    log4erl(File, NumProcs, Millis, Socket, Fmt, Args),
+    syslog(File, NumProcs, Millis, Socket, Fmt, Args),
     ok = gen_udp:close(Socket);
-main([App, NumberOfProcesses, MilliSeconds]) ->
+main([App, MessageType, NumberOfProcesses, MilliSeconds]) ->
     {NumProcs, Millis, Socket} = setup(NumberOfProcesses, MilliSeconds),
-    ?MODULE:(list_to_atom(App))(NumProcs, Millis, Socket),
+    {File, Fmt, Args} = get_fmt_args(MessageType),
+    io:format("  Profile:                  ~s~n", [MessageType]),
+    ?MODULE:(list_to_atom(App))(File, NumProcs, Millis, Socket, Fmt, Args),
     ok = gen_udp:close(Socket).
 
 %%%=============================================================================
@@ -145,69 +167,69 @@ teardown_app(StartedApps, AddedPaths) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-lager(NumProcs, Millis, Socket) ->
+lager(File, NumProcs, Millis, Socket, Fmt, Args) ->
     {ok, Paths} = setup_app(lager, pwd(), ?LAGER),
-    ok = application:set_env(lager, async_threshold, 30),
     ok = application:set_env(lager, error_logger_redirect, true),
     ok = application:set_env(lager, handlers, [{?MODULE, []}]),
     {ok, Started} = application:ensure_all_started(lager),
     timer:sleep(1000),
-    LogFun = fun() -> ok = lager:log(info, self(), ?FMT, ?ARGS) end,
-    ok = run_app(lager, LogFun, NumProcs, Millis, Socket),
+    LogFun = fun() -> ok = lager:log(info, self(), Fmt, Args) end,
+    ok = run_app(File, lager, LogFun, NumProcs, Millis, Socket),
     teardown_app(Started, Paths).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log4erl(NumProcs, Millis, Socket) ->
+log4erl(File, NumProcs, Millis, Socket, Fmt, Args) ->
     {ok, Paths} = setup_app(log4erl, pwd(), ?LOG4ERL),
     {ok, Started} = application:ensure_all_started(log4erl),
     Appender = {info, daemon, "localhost", ?TEST_PORT, "%b %D %t localhost %l"},
     {ok, _} = log4erl:add_syslog_appender(?MODULE, Appender),
-    LogFun = fun() -> ok = log4erl:log(info, ?FMT, ?ARGS) end,
-    ok = run_app(log4erl, LogFun, NumProcs, Millis, Socket),
+    LogFun = fun() -> ok = log4erl:log(info, Fmt, Args) end,
+    ok = run_app(File, log4erl, LogFun, NumProcs, Millis, Socket),
     teardown_app(Started, Paths).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-sasl_syslog(NumProcs, Millis, Socket) ->
+sasl_syslog(File, NumProcs, Millis, Socket, Fmt, Args) ->
     {ok, Paths} = setup_app(sasl_syslog, pwd(), ?SASL_SYSLOG),
     ok = application:set_env(sasl_syslog, enabled, true),
     ok = application:set_env(sasl_syslog, remote_host, "localhost"),
     ok = application:set_env(sasl_syslog, remote_port, ?TEST_PORT),
     {ok, Started} = application:ensure_all_started(sasl_syslog),
-    LogFun = fun() -> ok = error_logger:info_msg(?FMT, ?ARGS) end,
-    ok = run_app(sasl_syslog, LogFun, NumProcs, Millis, Socket),
+    LogFun = fun() -> ok = error_logger:info_msg(Fmt, Args) end,
+    ok = run_app(File, sasl_syslog, LogFun, NumProcs, Millis, Socket),
     teardown_app(Started, Paths).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-syslog(NumProcs, Millis, Socket) ->
+syslog(File, NumProcs, Millis, Socket, Fmt, Args) ->
     BaseDir = filename:join([pwd(), "..", ".."]),
     {ok, Paths} = setup_app(syslog, BaseDir, undefined),
     ok = application:set_env(syslog, dest_host, "localhost"),
     ok = application:set_env(syslog, dest_port, ?TEST_PORT),
     {ok, Started} = application:ensure_all_started(syslog),
-    LogFun = fun() -> ok = syslog:info_msg(?FMT, ?ARGS) end,
-    ok = run_app(syslog, LogFun, NumProcs, Millis, Socket),
+    LogFun = fun() -> ok = syslog:info_msg(Fmt, Args) end,
+    ok = run_app(File, syslog, LogFun, NumProcs, Millis, Socket),
     teardown_app(Started, Paths).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-run_app(App, Fun, NumProcs, Millis, Socket) ->
+run_app(File, App, Fun, NumProcs, Millis, Socket) ->
     ok = empty_mailbox(Socket),
     StartMillis = current_millis(),
     generate_messages(Fun, NumProcs, Millis),
     {NumSent, NumReceived, Memory, StopMillis} = process_messages(Socket, NumProcs),
-    report_statistics(App, NumSent, NumReceived, Memory, StopMillis - StartMillis).
+    Duration = StopMillis - StartMillis,
+    report_statistics(File, App, NumSent, NumReceived, Memory, Duration).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-report_statistics(App, NumSent, NumReceived, Memory, Duration) ->
+report_statistics(File, App, NumSent, NumReceived, Memory, Duration) ->
     NumSentPerSecond = NumSent * 1000 div Duration,
     io:format(
       "  Total Messages Sent:      ~p~n"
@@ -223,7 +245,7 @@ report_statistics(App, NumSent, NumReceived, Memory, Duration) ->
        NumSentPerSecond,
        Memory / 1048576]),
     file:write_file(
-      "benchmark.dat",
+      File,
       io_lib:format(
         "~-20s~-10B~-10B~-10B~-10.3f~n",
         [App, NumSent, NumSentPerSecond, Duration, Memory / 1048576]),
@@ -336,6 +358,12 @@ wait_for_os_cmd(Port, Cmd) ->
 %% @private
 %%------------------------------------------------------------------------------
 pwd() -> {ok, Dir} = file:get_cwd(), Dir.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_fmt_args("large") -> {?BENCHMARK_DAT("large"), ?LARGE_FMT, ?LARGE_ARGS};
+get_fmt_args(_)       -> {?BENCHMARK_DAT("small"), ?SMALL_FMT, ?SMALL_ARGS}.
 
 %%------------------------------------------------------------------------------
 %% @private
