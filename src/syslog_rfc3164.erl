@@ -49,7 +49,7 @@ hdr(Datetime, Pid, Cfg = #syslog_cfg{appname = A, beam_pid = B}) ->
 %% Format the MSG part of RFC 3164. Basically a noop.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(binary(), #syslog_cfg{}) -> iodata().
+-spec msg(binary(), #syslog_cfg{}) -> binary().
 msg(Msg, _Cfg) -> Msg.
 
 %%%=============================================================================

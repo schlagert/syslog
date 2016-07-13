@@ -84,7 +84,7 @@
 %% excluding the PRI part.
 %% @end
 
--callback msg(binary(), #syslog_cfg{}) -> iodata().
+-callback msg(binary(), #syslog_cfg{}) -> binary().
 %% @doc
 %% Format the message part (if necessary).
 %% @end

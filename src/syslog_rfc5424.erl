@@ -55,7 +55,7 @@ hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
 %% Format the MSG part of RFC 5424.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(binary(), #syslog_cfg{}) -> iodata().
+-spec msg(binary(), #syslog_cfg{}) -> binary().
 msg(Msg, #syslog_cfg{bom = Bom}) ->
     unicode:characters_to_binary([Bom, Msg]).
 
