@@ -78,7 +78,7 @@
 %%% Callback Definitions (the behaviour implemented by protocol backends)
 %%%=============================================================================
 
--callback hdr(syslog:datetime(), string(), #syslog_cfg{}) -> iodata().
+-callback hdr(syslog:datetime(), binary(), #syslog_cfg{}) -> iodata().
 %% @doc
 %% Format a header this should include everything including structured data but
 %% excluding the PRI part.
@@ -293,7 +293,7 @@ new_cfg() ->
        hostname = syslog_lib:get_hostname(),
        domain = syslog_lib:get_domain(),
        appname = syslog_lib:get_name(),
-       beam_pid = os:getpid(),
+       beam_pid = list_to_binary(os:getpid()),
        bom = get_bom()}.
 
 %%------------------------------------------------------------------------------

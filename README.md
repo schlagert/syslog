@@ -113,7 +113,7 @@ are available and can be configured in the application environment:
   output. So if you you don't care when a new process is started, set this
   flag to `true`. Default is `false`.
 
-* `{app_name, atom() | list()}`
+* `{app_name, atom() | string() | binary()}`
 
   Configured the value reported in the `APP-NAME` field of Syslog messages. If
   not set (the default), the name part of the node name will be used. If the

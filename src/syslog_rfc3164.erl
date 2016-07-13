@@ -35,7 +35,7 @@
 %% Format the HDR part of RFC 3164 excluding the PRI.
 %% @end
 %%------------------------------------------------------------------------------
--spec hdr(syslog:datetime(), string(), #syslog_cfg{}) -> iodata().
+-spec hdr(syslog:datetime(), binary(), #syslog_cfg{}) -> iodata().
 hdr(Datetime, Pid, Cfg = #syslog_cfg{appname = A, beam_pid = B}) ->
     [
      get_date(Datetime), $\s,

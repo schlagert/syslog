@@ -39,7 +39,7 @@
 %% elements.
 %% @end
 %%------------------------------------------------------------------------------
--spec hdr(syslog:datetime(), string(), #syslog_cfg{}) -> iodata().
+-spec hdr(syslog:datetime(), binary(), #syslog_cfg{}) -> iodata().
 hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
     [
      ?VERSION, $\s,
@@ -107,7 +107,9 @@ micro(M)                 -> integer_to_list(M).
 %% @private
 %%------------------------------------------------------------------------------
 truncate(L, S) when length(S) =< L -> S;
-truncate(L, S)                     -> string:substr(S, 1, L).
+truncate(L, S) when size(S) =< L   -> S;
+truncate(L, S) when is_list(S)     -> string:substr(S, 1, L);
+truncate(L, S) when is_binary(S)   -> binary:part(S, 0, L).
 
 %%%=============================================================================
 %%% Tests
@@ -123,12 +125,19 @@ get_date_test() ->
     ?assertMatch({match, _}, re:run(lists:flatten(get_date(Datetime)), Rx)).
 
 truncate_test() ->
-    ?assertEqual("",    truncate(0, "")),
-    ?assertEqual("",    truncate(1, "")),
-    ?assertEqual("",    truncate(0, "123")),
-    ?assertEqual("1",   truncate(1, "123")),
-    ?assertEqual("12",  truncate(2, "123")),
-    ?assertEqual("123", truncate(3, "123")),
-    ?assertEqual("123", truncate(4, "123")).
+    ?assertEqual("",        truncate(0, "")),
+    ?assertEqual("",        truncate(1, "")),
+    ?assertEqual("",        truncate(0, "123")),
+    ?assertEqual("1",       truncate(1, "123")),
+    ?assertEqual("12",      truncate(2, "123")),
+    ?assertEqual("123",     truncate(3, "123")),
+    ?assertEqual("123",     truncate(4, "123")),
+    ?assertEqual(<<>>,      truncate(0, <<>>)),
+    ?assertEqual(<<>>,      truncate(1, <<>>)),
+    ?assertEqual(<<>>,      truncate(0, <<"123">>)),
+    ?assertEqual(<<"1">>,   truncate(1, <<"123">>)),
+    ?assertEqual(<<"12">>,  truncate(2, <<"123">>)),
+    ?assertEqual(<<"123">>, truncate(3, <<"123">>)),
+    ?assertEqual(<<"123">>, truncate(4, <<"123">>)).
 
 -endif.

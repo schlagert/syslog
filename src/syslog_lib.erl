@@ -80,12 +80,13 @@ get_domain(Hostname) ->
 %% string `"beam"' will be returned.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_name() -> string().
+-spec get_name() -> binary().
 get_name() ->
     case ?GET_ENV(app_name) of
-        {ok, Name} when is_list(Name) -> Name;
-        {ok, Name} when is_atom(Name) -> atom_to_list(Name);
-        undefined                     -> get_name_from_node(node())
+        {ok, Name} when is_binary(Name) -> Name;
+        {ok, Name} when is_list(Name)   -> list_to_binary(Name);
+        {ok, Name} when is_atom(Name)   -> atom_to_binary(Name, utf8);
+        undefined                       -> get_name_from_node(node())
     end.
 
 %%------------------------------------------------------------------------------
@@ -106,15 +107,15 @@ get_property_(_, Value)         -> Value.
 %% (locally) registered name of the process or its process id.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_pid(pid() | atom() | string()) -> string().
+-spec get_pid(pid() | atom() | string()) -> binary().
 get_pid(N) when is_list(N) ->
-    N;
+    list_to_binary(N);
 get_pid(N) when is_atom(N) ->
-    atom_to_list(N);
+    atom_to_binary(N, utf8);
 get_pid(P) when is_pid(P) ->
     case catch process_info(P, registered_name) of
-        {registered_name, N} -> atom_to_list(N);
-        _                    -> pid_to_list(P)
+        {registered_name, N} -> atom_to_binary(N, utf8);
+        _                    -> list_to_binary(pid_to_list(P))
     end.
 
 %%------------------------------------------------------------------------------
@@ -149,9 +150,9 @@ get_utc_offset(Utc, Local) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_name_from_node(Node) ->
-    case atom_to_list(Node) of
-        "nonode@nohost" -> "beam";
-        N               -> hd(string:tokens(N, "@"))
+    case atom_to_binary(Node, utf8) of
+        <<"nonode@nohost">> -> <<"beam">>;
+        N                   -> hd(binary:split(N, <<"@">>))
     end.
 
 %%------------------------------------------------------------------------------
@@ -228,13 +229,13 @@ get_domain_test() ->
     ?assertEqual("domain.de", get_domain("host.domain.de")).
 
 get_name_from_node_test() ->
-    ?assertEqual("beam",     get_name_from_node('nonode@nohost')),
-    ?assertEqual("nodename", get_name_from_node('nodename@hostname')),
-    ?assertEqual("nodename", get_name_from_node('nodename@hostname.dom.ain')).
+    ?assertEqual(<<"beam">>,     get_name_from_node('nonode@nohost')),
+    ?assertEqual(<<"nodename">>, get_name_from_node('nodename@hostname')),
+    ?assertEqual(<<"nodename">>, get_name_from_node('nodename@hostname.dom.ain')).
 
 get_pid_test() ->
-    ?assertEqual("init", get_pid(init)),
-    ?assertEqual("init", get_pid(whereis(init))),
-    ?assertEqual(pid_to_list(self()), get_pid(self())).
+    ?assertEqual(<<"init">>, get_pid(init)),
+    ?assertEqual(<<"init">>, get_pid(whereis(init))),
+    ?assertEqual(list_to_binary(pid_to_list(self())), get_pid(self())).
 
 -endif. %% TEST
