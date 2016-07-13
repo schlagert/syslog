@@ -1,6 +1,6 @@
 %%%=============================================================================
 %%% Copyright 2011, Travelping GmbH <info@travelping.com>
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -37,6 +37,7 @@
          warning_msg/2,
          error_msg/1,
          error_msg/2,
+         msg/2,
          msg/3,
          msg/4,
          set_log_level/1]).
@@ -86,7 +87,7 @@
 %% Sends a message with severity `debug'. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec debug_msg(string()) -> ok.
+-spec debug_msg(io:format()) -> ok.
 debug_msg(Msg) -> debug_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
@@ -94,7 +95,7 @@ debug_msg(Msg) -> debug_msg(Msg, []).
 %% Sends a format message with severity `debug'. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec debug_msg(string(), [term()]) -> ok.
+-spec debug_msg(io:format(), [term()]) -> ok.
 debug_msg(Fmt, Args) -> msg(debug, Fmt, Args).
 
 %%------------------------------------------------------------------------------
@@ -103,7 +104,7 @@ debug_msg(Fmt, Args) -> msg(debug, Fmt, Args).
 %% counterpart this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec info_msg(string()) -> ok.
+-spec info_msg(io:format()) -> ok.
 info_msg(Msg) -> info_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
@@ -112,7 +113,7 @@ info_msg(Msg) -> info_msg(Msg, []).
 %% counterpart this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec info_msg(string(), [term()]) -> ok.
+-spec info_msg(io:format(), [term()]) -> ok.
 info_msg(Fmt, Args) -> msg(informational, Fmt, Args).
 
 %%------------------------------------------------------------------------------
@@ -121,7 +122,7 @@ info_msg(Fmt, Args) -> msg(informational, Fmt, Args).
 %% this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec warning_msg(string()) -> ok.
+-spec warning_msg(io:format()) -> ok.
 warning_msg(Msg) -> warning_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
@@ -130,7 +131,7 @@ warning_msg(Msg) -> warning_msg(Msg, []).
 %% counterpart this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec warning_msg(string(), [term()]) -> ok.
+-spec warning_msg(io:format(), [term()]) -> ok.
 warning_msg(Fmt, Args) -> msg(warning, Fmt, Args).
 
 %%------------------------------------------------------------------------------
@@ -139,7 +140,7 @@ warning_msg(Fmt, Args) -> msg(warning, Fmt, Args).
 %% this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec error_msg(string()) -> ok.
+-spec error_msg(io:format()) -> ok.
 error_msg(Msg) -> error_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
@@ -148,15 +149,23 @@ error_msg(Msg) -> error_msg(Msg, []).
 %% counterpart this function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec error_msg(string(), [term()]) -> ok.
+-spec error_msg(io:format(), [term()]) -> ok.
 error_msg(Fmt, Args) -> msg(error, Fmt, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a message with a specific severity. This function never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec msg(severity(), io:format()) -> ok.
+msg(Severity, Msg) -> msg(Severity, Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% Logs a format message with a specific severity. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(severity(), string(), [term()]) -> ok.
+-spec msg(severity(), io:format(), [term()]) -> ok.
 msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 
 %%------------------------------------------------------------------------------
@@ -165,7 +174,7 @@ msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 %% function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(severity(), proc_name(), string(), [term()]) -> ok.
+-spec msg(severity(), proc_name(), io:format(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
     syslog_logger:maybe_log(Severity, Pid, os:timestamp(), Fmt, Args).
 
