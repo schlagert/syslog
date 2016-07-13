@@ -1,32 +1,22 @@
 %%%=============================================================================
-%%% Copyright (c) 2011-2013 Basho Technologies, Inc.  All Rights Reserved.
 %%% Copyright (c) 2013-2016 Tobias Schlager <schlagert@github.com>
 %%%
-%%% This file is provided to you under the Apache License,
-%%% Version 2.0 (the "License"); you may not use this file
-%%% except in compliance with the License.  You may obtain
-%%% a copy of the License at
+%%% Permission to use, copy, modify, and/or distribute this software for any
+%%% purpose with or without fee is hereby granted, provided that the above
+%%% copyright notice and this permission notice appear in all copies.
 %%%
-%%%   http://www.apache.org/licenses/LICENSE-2.0
-%%%
-%%% Unless required by applicable law or agreed to in writing,
-%%% software distributed under the License is distributed on an
-%%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%%% KIND, either express or implied.  See the License for the
-%%% specific language governing permissions and limitations
-%%% under the License.
+%%% THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+%%% WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+%%% MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+%%% ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+%%% WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+%%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+%%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
 %%% The main gen_event manager of the `syslog' application. All logged events
-%%% will be directed through this process. This module does also define an
-%%% internal event handler used for accelerate/decelerate message submission by
-%%% toggling between synchronous and asynchronous gen_event notification.
-%%%
-%%% Since the above idea was taken from basho's
-%%% <a href="https://github.com/basho/lager">lager</a> project this file was put
-%%% under lager's license (Apache 2.0) and it's copyright was inherited.
-%%% `lager's implementation of the same feature can be found in the module
-%%% `lager_backend_throttle.erl'.
+%%% will be directed through this process. This module does also define a simple
+%%% event handler that sends incoming `iodata()' to the configured destination.
 %%%
 %%% This module also performs the formatting of messages into the configured
 %%% protocol format. Note that this is completely done in the calling (logging)
@@ -39,7 +29,6 @@
 %%%
 %%% @see syslog_rfc3164
 %%% @see syslog_rfc5424
-%%% @see syslog_logger_h
 %%% @end
 %%%=============================================================================
 -module(syslog_logger).
@@ -63,6 +52,8 @@
 -include("syslog.hrl").
 
 -define(ASYNC_LIMIT, 30).
+-define(DEST_HOST, {127, 0, 0, 1}).
+-define(DEST_PORT, 514).
 -define(FACILITY, ?SYSLOG_FACILITY).
 -define(PROTOCOL, rfc3164).
 
@@ -163,35 +154,29 @@ set_log_level(Level) -> gen_event:call(?MODULE, ?MODULE, {set_level, Level}).
 %%%=============================================================================
 
 -record(state, {
-          async = true   :: boolean(),
-          log_level      :: 0..7,
-          async_limit    :: pos_integer() | infinity}).
+          socket    :: inet:socket(),
+          dest_host :: inet:ip_address() | inet:hostname(),
+          dest_port :: inet:port_number(),
+          log_level :: 0..7}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
     Opts = new_opts(syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)),
-    Limit = erlang:max(1, syslog_lib:get_property(async_limit, ?ASYNC_LIMIT)),
-    State = #state{async_limit = Limit, log_level = Opts#opts.log_level},
-    {ok, set_fun(set_opts(Opts, State))}.
+    {ok, Socket} = gen_udp:open(0, [binary]),
+    State = #state{
+               socket = Socket,
+               dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST),
+               dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT),
+               log_level = Opts#opts.log_level},
+    {ok, set_opts(Opts, State)}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, _}, State = #state{async_limit = AsyncLimit})
-  when AsyncLimit =/= infinity ->
-    {message_queue_len, QueueLen} = process_info(self(), message_queue_len),
-    case {QueueLen > AsyncLimit, State#state.async} of
-        {true, true} ->
-            {ok, set_fun(State#state{async = false})};
-        {false, false} ->
-            {ok, set_fun(State#state{async = true})};
-        _ ->
-            {ok, State}
-    end;
-handle_event(_, State) ->
-    {ok, State}.
+handle_event({log, Msg}, State) -> {ok, send(Msg, State)};
+handle_event(_, State)          -> {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -211,12 +196,13 @@ handle_call(_Request, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info(_Info, State) -> {ok, State}.
+handle_info({udp_closed, S}, #state{socket = S}) -> {error, {udp_closed, S}};
+handle_info(_Info, State)                        -> {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Arg, #state{}) -> ok.
+terminate(_Arg, #state{socket = Socket}) -> gen_udp:close(Socket).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -226,6 +212,13 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+send(Data, State = #state{socket = S, dest_host = H, dest_port = P}) ->
+    ok = gen_udp:send(S, H, P, Data),
+    State.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -278,7 +271,7 @@ forward(PRI, HDR, MSG, #opts{function = Fun}) ->
 %%------------------------------------------------------------------------------
 new_opts(Level) ->
     #opts{
-       function = notify,
+       function = get_function(),
        log_level = map_severity(Level),
        protocol = get_protocol(),
        facility = syslog_lib:get_property(facility, ?FACILITY),
@@ -314,17 +307,6 @@ get_opts() ->
 %%------------------------------------------------------------------------------
 set_opts(Opts = #opts{}, State) ->
     true = ets:insert(?MODULE, Opts),
-    State.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-set_fun(State = #state{async = false}) ->
-    set_fun(sync_notify, State);
-set_fun(State = #state{async = true}) ->
-    set_fun(notify, State).
-set_fun(Fun, State) ->
-    true = ets:update_element(?MODULE, opts, {#opts.function, Fun}),
     State.
 
 %%------------------------------------------------------------------------------
@@ -384,6 +366,15 @@ get_protocol() ->
     case syslog_lib:get_property(protocol, ?PROTOCOL) of
         rfc5424 -> syslog_rfc5424;
         rfc3164 -> syslog_rfc3164
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_function() ->
+    case syslog_lib:get_property(async, false) of
+        true  -> notify;
+        false -> sync_notify
     end.
 
 %%------------------------------------------------------------------------------

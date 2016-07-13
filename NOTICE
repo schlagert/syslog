@@ -1,11 +1,5 @@
 Syslog Client Logging Framework for Erlang
 
-This software contains code derived from the lager project developed and
-maintained by Basho Technologies, Inc. and contributors. The Apache 2.0 license
-is applied to the file 'syslog_logger.erl' solely. It is basically a modified
-version of the file 'lager_backend_throttle.erl'. The original software is
-available from https://github.com/basho/lager.
-
-This software also contains code derived from the sasl_syslog project developed
+This software contains code derived from the sasl_syslog project developed
 and maintained by Travelping GmbH and contributors. The original software is
 available from https://github.com/travelping/sasl_syslog.

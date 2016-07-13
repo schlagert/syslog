@@ -28,10 +28,10 @@ monitor_test() ->
     ok = application:start(sasl),
     ok = application:start(syslog),
 
-    ?assert(has_hander(syslog_logger_h, syslog_logger)),
-    gen_event:delete_handler(syslog_logger, syslog_logger_h, []),
+    ?assert(has_hander(syslog_error_h, error_logger)),
+    gen_event:delete_handler(error_logger, syslog_error_h, []),
     timer:sleep(500),
-    ?assert(has_hander(syslog_logger_h, syslog_logger)),
+    ?assert(has_hander(syslog_error_h, error_logger)),
 
     ok = application:stop(syslog),
     ok = application:stop(sasl).

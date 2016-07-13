@@ -23,8 +23,8 @@ implies `syslog` is specialized in delivering its messages using Syslog only,
 there is no file or console backend, no custom-written and configurable log
 rotation, no line formatting and no tracing support. However, `syslog` does not
 rely on port drivers or NIFs to implement the Syslog protocol and it includes
-most of the beloved features known from `lager`, for example sync/async
-logging and supervised event handler registration.
+measures to enhance the overall robustness of a node, e.g. load distribution,
+throughput optimization, etc.
 
 Features
 --------
@@ -38,8 +38,6 @@ Features
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
 * Configurable verbosity of SASL printing format (printing depth is also
   configurable).
-* Throughput optimization by dynamically switching from synchronous to
-  asynchronous mode.
 * Load distribution between all concurrently logging processes by moving the
   message formatting into the calling process(es).
 * Built-in `lager` backend to bridge between both frameworks.
@@ -126,19 +124,19 @@ are available and can be configured in the application environment:
   then the configured level will be discarded. Default is `debug` (discard
   nothing).
 
-* `{async_limit, pos_integer() | infinity}`
+* `{async, boolean()}`
 
-  Specifies the number of entries in the `syslog_logger` message queue to which
-  asynchronous logging is allowed. As long as the message queue does not exceed
-  this limit every logging statement will by asynchronous. If the message queue
-  length exceeds this limit all logging statements will be synchronous, blocking
-  the calling process until the logging request was processed. Default is `30`.
+  Specifies whether log message offloading into the `syslog_logger` event
+  manager is done synchronously or asynchronously. It is highly recommended
+  to leave this at its default value `false` because asynchronous delivery is
+  really dangerous. A simple log burst of a few thousand processes may be enough
+  to take your node down (due to out-of-memory).
 
 If your application really needs fast asynchronous logging and you like to live
-dangerously, logging should be done using the `error_logger` API and the
-`syslog` application should be configured with `{async_limit, infinity}`. This
-should prevent `syslog` from switching to synchronous mode and all message
-queues are allowed to grow indefinitely.
+dangerously, logging can be done either with the `error_logger` or the `syslog`
+API and the `syslog` application should be configured with `{async, true}`. This
+sets `syslog` into asynchronous delivery mode and all message queues are
+allowed to grow indefinitely.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It
@@ -182,6 +180,8 @@ logging into `syslog` you can use something like the following in your
 Performance
 -----------
 
+TODO update on new numbers
+
 Performance profiling has been made with a small script located in the
 `benchmark` subdirectory. The figures below show the results of
 `benchmark.escript all 100 10000` on an Intel(R) Core(TM)2 Duo CPU running R16B.
@@ -218,10 +218,10 @@ History
 
 ### Master
 
+* Remove dynamic switching of log message delivery. Make mode explicitly
+  configurable with the new `async` directive.
 * Add `app_name` configuration directive to allow configuration of the
   `APP-NAME` field value (thanks to @comtihon).
-* Add ability to disable switching to synchronous logging by setting
-  `async_limit` to `infinity` (thanks to @comtihon).
 * Change severity of messages sent by `error_logger:info_[msg|report]/1,2` and
   `syslog:info_msg/1,2` from `notice` to `informational` (thanks to @comtihon).
 * Add `log_level` configuration directive. With this configuration it is
