@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2013, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2016, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,8 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% The event handler to be attached to the `error_logger' event manager.
+%%% An event handler to be attached to the `error_logger' event manager.
+%%%
 %%% The received messages will be formatted and forwarded to the
 %%% {@link syslog_logger} event manager.
 %%%
