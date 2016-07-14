@@ -180,46 +180,41 @@ logging into `syslog` you can use something like the following in your
 Performance
 -----------
 
-TODO update on new numbers
+Performance profiling has been made with a the benchmark script located in the
+`benchmark` subdirectory. The figures below show the results of best-of-five
+runs on an Intel(R) Core(TM) i7-4790 CPU running OTP 17.4.
 
-Performance profiling has been made with a small script located in the
-`benchmark` subdirectory. The figures below show the results of
-`benchmark.escript all 100 10000` on an Intel(R) Core(TM)2 Duo CPU running R16B.
+The benchmark spawns `N` processes that each send log messages, using a specific
+logging framework, in a tight loop for _10000ms_. All log messages will be
+delivered over UDP (faked remote Syslog) to a socket opened by the benchmark
+itself. The total duration is the time it took to spawn the processes, send the
+messages __and__ the time it took to receive all sent messages at the socket
+that the benchmark process listens on.
 
-The above line starts a benchmark that will spawn 100 processes that each send
-log message, using a specific logging framework, in a tight loop for 10000ms.
-All log messages will be delivered over UDP (faked remote Syslog) to a socket
-opened by the benchmark process. The total duration is the time it took to spawn
-the processes, send the messages __and__ the time it took to receive all sent
-messages at the socket that the benchmark process listens on.
+All frameworks are used in their default configuration with their native logging
+function (*not* `error_logger`).
 
-<img src="https://cloud.githubusercontent.com/assets/404313/12110992/20d2254c-b392-11e5-83dc-64cc59bd7ad6.png" alt="benchmark results" />
+To be able to compare `lager` with the other frameworks, the benchmark contains
+a very simple backend, that forwards log messages formatted with the
+`lager_default_formatter` using `gen_udp`, e.g. like `syslog` does it.
 
-As expected `syslog` and `lager` are the top performers. The main reason why
-they outperform `log4erl` is the dynamic toggling of synchronous/asynchronous
-logging (`log4erl` uses synchronous logging only).
+The `sasl_syslog` application is left out of scope, simply because it crashes
+the Erlang VM on every run (due to its purely asynchronous logging).
 
-Since `sasl_syslog` uses the asynchronous `error_logger` the number of messages
-sent is quite huge. However, it also takes a vast amount of time and memory to
-process the long `error_logger` message queue. This is also responsible for the
-low number of messages sent per second in total.
+<img src="https://cloud.githubusercontent.com/assets/404313/16836745/5af8562e-49bf-11e6-8ba0-89a99d1a73f5.png" alt="small benchmark" />
 
-A word about the performance of `lager`. Fitting `lager` into the benchmark
-was unfortunately a bit tricky since the benchmark needs to know when all
-messages were processed. However, `lager_syslog` uses a C port driver calling
-`vsyslog` and thus does not support remote syslog. So instead of testing the
-`lager_syslog_backend` the benchmark uses the `lager_console_backend`, setting
-itself as the receiver for I/O messages and forwards them to the UDP socket
-mentioned earlier. This would in fact slow down `lager` a bit, which would
-explain the slightly better performance of `syslog`.
+<img src="https://cloud.githubusercontent.com/assets/404313/16836747/5f04b848-49bf-11e6-9c28-603eb66036f4.png" alt="large benchmark" />
+
+TODO explain results/findings
 
 History
 -------
 
 ### Master
 
-* Remove dynamic switching of log message delivery. Make mode explicitly
-  configurable with the new `async` directive.
+* Remove dynamic switching of log message delivery mode. Make mode explicitly
+  configurable with the new `async` directive and the `syslog:set_log_mode/1`
+  API.
 * Add `app_name` configuration directive to allow configuration of the
   `APP-NAME` field value (thanks to @comtihon).
 * Change severity of messages sent by `error_logger:info_[msg|report]/1,2` and
@@ -265,7 +260,7 @@ History
 Supervision
 -----------
 
-<img src="https://cloud.githubusercontent.com/assets/404313/12110956/c59eec28-b391-11e5-936d-4e236f702ef0.png" alt="syslog supervision" />
+<img src="https://cloud.githubusercontent.com/assets/404313/16836729/43c90a66-49bf-11e6-9ec5-d39451c25deb.png" alt="syslog supervision" />
 
 For the curious; the above illustration shows the very simple supervision
 hierarchy used by the `syslog` application.
