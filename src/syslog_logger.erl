@@ -39,7 +39,8 @@
 -export([start_link/0,
          maybe_log/4,
          maybe_log/5,
-         set_log_level/1]).
+         set_log_level/1,
+         set_log_mode/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -157,6 +158,25 @@ set_log_level(Level) ->
             end;
         _ ->
             {error, {bad_log_level, Level}}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Change the log mode to the given mode.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_log_mode(async | sync | {sync, pos_integer()}) ->
+                          ok | {error, term()}.
+set_log_mode(async) ->
+    set_log_function(get_function(true));
+set_log_mode(sync) ->
+    set_log_function(get_function(false));
+set_log_mode({sync, Timeout}) when is_integer(Timeout), Timeout > 0 ->
+    set_log_function({call, Timeout}).
+set_log_function(Function) ->
+    case ets:update_element(?MODULE, opts, {#opts.function, Function}) of
+        true  -> ok;
+        false -> {error, {not_running, syslog}}
     end.
 
 %%%=============================================================================

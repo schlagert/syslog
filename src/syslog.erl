@@ -40,7 +40,8 @@
          msg/2,
          msg/3,
          msg/4,
-         set_log_level/1]).
+         set_log_level/1,
+         set_log_mode/1]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -169,11 +170,20 @@ msg(Severity, Pid, Fmt, Args) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Set the log level to the given value.
+%% Change the log level to the given value.
 %% @end
 %%------------------------------------------------------------------------------
 -spec set_log_level(severity()) -> ok | {error, term()}.
 set_log_level(Level) -> syslog_logger:set_log_level(Level).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Change the log mode to the given mode.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_log_mode(async | sync | {sync, pos_integer()}) ->
+                          ok | {error, term()}.
+set_log_mode(Mode) -> syslog_logger:set_log_mode(Mode).
 
 %%%=============================================================================
 %%% Application callbacks
