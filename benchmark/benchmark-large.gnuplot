@@ -18,10 +18,10 @@
 ################################################################################
 
 set output 'benchmark-large.png'
-set terminal png size 1100,400 font 'Ubuntu' 11
+set terminal png size 900,500 font 'Ubuntu' 11
 
 set grid
-set multiplot layout 1,3 title 'benchmark.escript all large 1000 10000'
+set multiplot layout 2,3 title 'benchmark.escript all large [N] 10000'
 
 set style fill solid 0.9
 set style data boxes
@@ -36,16 +36,28 @@ set grid back ls 12
 set bmargin 3
 set boxwidth 0.6 absolute
 
-set title 'Throughput'
+set title 'Throughput (N=100)'
 set ylabel 'logs per second'
-plot 'benchmark-large.dat' using 3:xticlabel(1) lt rgb '#8b1a0e' title ''
+plot 'benchmark-large-100.dat' using 3:xticlabel(1) lt rgb '#8b1a0e' title ''
 
-set title 'Total Duration'
+set title 'Total Duration (N=100)'
 set ylabel 'milliseconds'
-plot 'benchmark-large.dat' using 4:xticlabel(1) lt rgb '#8b1a0e' title ''
+plot 'benchmark-large-100.dat' using 4:xticlabel(1) lt rgb '#8b1a0e' title ''
 
-set title 'Peak Memory Used'
+set title 'Peak Memory Used (N=100)'
 set ylabel 'megabytes'
-plot 'benchmark-large.dat' using 5:xticlabel(1) lt rgb '#8b1a0e' title ''
+plot 'benchmark-large-100.dat' using 5:xticlabel(1) lt rgb '#8b1a0e' title ''
+
+set title 'Throughput (N=1000)'
+set ylabel 'logs per second'
+plot 'benchmark-large-1000.dat' using 3:xticlabel(1) lt rgb '#8b1a0e' title ''
+
+set title 'Total Duration (N=1000)'
+set ylabel 'milliseconds'
+plot 'benchmark-large-1000.dat' using 4:xticlabel(1) lt rgb '#8b1a0e' title ''
+
+set title 'Peak Memory Used (N=1000)'
+set ylabel 'megabytes'
+plot 'benchmark-large-1000.dat' using 5:xticlabel(1) lt rgb '#8b1a0e' title ''
 
 unset multiplot

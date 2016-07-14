@@ -76,7 +76,7 @@
          "cccccc"
         ]).
 
--define(BENCHMARK_DAT(Type), "benchmark-" ++ Type ++ ".dat").
+-define(BENCHMARK_DAT(T, N), "benchmark-" ++ T ++ "-" ++ N ++ ".dat").
 
 -define(LAGER,       "https://github.com/basho/lager.git").
 -define(LOG4ERL,     "https://github.com/ahmednawras/log4erl.git").
@@ -102,16 +102,16 @@ main([App, MessageType, NumberOfProcesses]) ->
     main([App, MessageType, NumberOfProcesses, "2000"]);
 main(["all", MessageType, NumberOfProcesses, MilliSeconds]) ->
     {NumProcs, Millis, Socket} = setup(NumberOfProcesses, MilliSeconds),
-    {File, Fmt, Args} = get_fmt_args(MessageType),
-    io:format("  Profile:                  ~s~n", [MessageType]),
+    {File, Fmt, Args} = get_fmt_args(MessageType, NumberOfProcesses),
+    io:format("  Profile:                     ~s~n", [MessageType]),
     lager(File, NumProcs, Millis, Socket, Fmt, Args),
     log4erl(File, NumProcs, Millis, Socket, Fmt, Args),
     syslog(File, NumProcs, Millis, Socket, Fmt, Args),
     ok = gen_udp:close(Socket);
 main([App, MessageType, NumberOfProcesses, MilliSeconds]) ->
     {NumProcs, Millis, Socket} = setup(NumberOfProcesses, MilliSeconds),
-    {File, Fmt, Args} = get_fmt_args(MessageType),
-    io:format("  Profile:                  ~s~n", [MessageType]),
+    {File, Fmt, Args} = get_fmt_args(MessageType, NumberOfProcesses),
+    io:format("  Profile:                     ~s~n", [MessageType]),
     ?MODULE:(list_to_atom(App))(File, NumProcs, Millis, Socket, Fmt, Args),
     ok = gen_udp:close(Socket).
 
@@ -128,8 +128,8 @@ setup(NumberOfProcesses, MilliSeconds) ->
     io:format(
       "Benchmark~n"
       "---------~n"
-      "  Process(es):              ~p~n"
-      "  Duration:                 ~pms~n",
+      "  Process(es):                 ~p~n"
+      "  Duration (ms):               ~p~n",
       [NumProcs, Millis]),
     ok = error_logger:tty(false),
     ok = application:load(sasl),
@@ -142,7 +142,7 @@ setup(NumberOfProcesses, MilliSeconds) ->
 %% @private
 %%------------------------------------------------------------------------------
 setup_app(App, BaseDir, GitURL) ->
-    io:format("  Application:              ~s~n", [App]),
+    io:format("  Application:                 ~s~n", [App]),
     ProjectDir = filename:join([BaseDir, atom_to_list(App)]),
     if is_list(GitURL) -> ok = retrieve(GitURL, ProjectDir);
        true            -> ok
@@ -224,31 +224,33 @@ run_app(File, App, Fun, NumProcs, Millis, Socket) ->
     generate_messages(Fun, NumProcs, Millis),
     {NumSent, NumReceived, Memory, StopMillis} = process_messages(Socket, NumProcs),
     Duration = StopMillis - StartMillis,
-    report_statistics(File, App, NumSent, NumReceived, Memory, Duration).
+    report_statistics(File, App, NumSent, NumReceived, Memory, Duration, Millis, NumProcs).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-report_statistics(File, App, NumSent, NumReceived, Memory, Duration) ->
-    NumSentPerSecond = NumSent * 1000 div Duration,
+report_statistics(File, App, NumSent, NumReceived, Memory, Duration, Millis, NumProcs) ->
+    Throughput = NumReceived * 1000 div Duration,
     io:format(
-      "  Total Messages Sent:      ~p~n"
-      "  Total Messages Received:  ~p~n"
-      "  Total Messages Dropped:   ~p~n"
-      "  Total Duration:           ~pms~n"
-      "  Messages Sent Per Second: ~p~n"
-      "  Peak Memory Used:         ~pMB~n",
+      "  Total Messages Sent:         ~w~n"
+      "  Total Messages Received:     ~w~n"
+      "  Total Messages Dropped:      ~w~n"
+      "  Total Duration (ms):         ~w~n"
+      "  Speed (msgs/s/proc):         ~w~n"
+      "  Message Throughput (msgs/s): ~w~n"
+      "  Peak Memory Used (MB):       ~w~n",
       [NumSent,
        NumReceived,
        NumSent - NumReceived,
        Duration,
-       NumSentPerSecond,
+       (NumSent * 1000 div Millis) div NumProcs,
+       Throughput,
        Memory / 1048576]),
     file:write_file(
       File,
       io_lib:format(
         "~-20s~-10B~-10B~-10B~-10.3f~n",
-        [App, NumSent, NumSentPerSecond, Duration, Memory / 1048576]),
+        [App, NumSent, Throughput, Duration, Memory / 1048576]),
       [append]).
 
 %%------------------------------------------------------------------------------
@@ -362,8 +364,10 @@ pwd() -> {ok, Dir} = file:get_cwd(), Dir.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_fmt_args("large") -> {?BENCHMARK_DAT("large"), ?LARGE_FMT, ?LARGE_ARGS};
-get_fmt_args(_)       -> {?BENCHMARK_DAT("small"), ?SMALL_FMT, ?SMALL_ARGS}.
+get_fmt_args("large", NumberOfProcesses) ->
+    {?BENCHMARK_DAT("large", NumberOfProcesses), ?LARGE_FMT, ?LARGE_ARGS};
+get_fmt_args(_, NumberOfProcesses) ->
+    {?BENCHMARK_DAT("small", NumberOfProcesses), ?SMALL_FMT, ?SMALL_ARGS}.
 
 %%------------------------------------------------------------------------------
 %% @private
