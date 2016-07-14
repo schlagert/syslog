@@ -132,6 +132,14 @@ are available and can be configured in the application environment:
   dangerous. A simple log burst of a few thousand processes may be enough
   to take your node down (due to out-of-memory).
 
+* `{timeout, pos_integer()}`
+
+  Specifies an upper bound in milliseconds a single process gets blocked in
+  a log call (only if `{async, false}`). This is useful if your application
+  has performance restrictions (under high load) and you are willing to
+  sacrifice safety for this reason. It's still safer to set this to a lower
+  value than completely switching to `{async, true}`. Default is `1000`ms.
+
 If your application really needs fast asynchronous logging and you like to live
 dangerously, logging can be done either with the `error_logger` or the `syslog`
 API and the `syslog` application should be configured with `{async, true}` and
@@ -184,28 +192,69 @@ Performance profiling has been made with a the benchmark script located in the
 `benchmark` subdirectory. The figures below show the results of best-of-five
 runs on an Intel(R) Core(TM) i7-4790 CPU running OTP 17.4.
 
-The benchmark spawns `N` processes that each send log messages, using a specific
-logging framework, in a tight loop for _10000ms_. All log messages will be
-delivered over UDP (faked remote Syslog) to a socket opened by the benchmark
-itself. The total duration is the time it took to spawn the processes, send the
-messages __and__ the time it took to receive all sent messages at the socket
-that the benchmark process listens on.
+The benchmark simulates a hard burst by spawning `N` processes that each send
+log messages, using a specific logging framework, in a tight loop for _10000ms_.
+All log messages will be delivered over UDP (faked remote Syslog) to a socket
+opened by the benchmark itself. The total duration is the time it took to spawn
+the processes, send the messages __and__ the time it took to receive all sent
+messages at the socket that the benchmark process listens on. The benchmark has
+two profiles. The `large` profiles uses log messages with a size of ~840bytes
+and the `small` profile uses log messages with a size of ~40bytes.
 
 All frameworks are used in their default configuration with their native logging
 function (*not* `error_logger`).
 
 To be able to compare `lager` with the other frameworks, the benchmark contains
 a very simple backend, that forwards log messages formatted with the
-`lager_default_formatter` using `gen_udp`, e.g. like `syslog` does it.
+`lager_default_formatter` using `gen_udp`, e.g. like `syslog` does it. The
+`sasl_syslog` application is left out of scope, simply because it crashes the
+Erlang VM on every run (due to its purely asynchronous logging).
 
-The `sasl_syslog` application is left out of scope, simply because it crashes
-the Erlang VM on every run (due to its purely asynchronous logging).
+Now let's see the numbers.
+
+### Small Profile
+
+For a relatively small number of senders, all frameworks have a pretty good
+throughput and the completion time is almost equal. While memory consumption is
+generally low, the `lager` application uses significant more memory. This is due
+to the dynamic switching between synchronous and asynchronous message delivery:
+When delivery starts in asynchronous mode many log messages pile up in the
+loggers message queue. When the framework finally switches to synchronous mode
+the logger is busy sending out these messages while senders get blocked.
 
 <img src="https://cloud.githubusercontent.com/assets/404313/16836745/5af8562e-49bf-11e6-8ba0-89a99d1a73f5.png" alt="small benchmark" />
 
+Adding more processes to the party makes the above mentioned effect more
+dramatic. While `log4erl` and `syslog` perform quite well by evening the the
+load on the internal logger using synchronous logging, `lager` piles up a hugh
+amount of messages in the internal logger. It takes the framework almose two
+minutes to process these messages.
+
+When looking at the memory usage it can be observed that `lager`'s backend
+throttling (which was also used in `syslog` up to this version) is effectively
+useless to protect from bursts with small log messages. Switching is simply too
+slow and once messages begin to pile up, the node keeps being busy sending these
+messages. Additionally, senders may get blocked an indefinite amount of time
+(remember that `gen_event:sync_notify/2` uses `infinity` for timeouts). During
+the test it could be observed that some senders were blocked over 50 seconds!
+
+### Large Profile
+
+Numbers get interesting when large strings need to be copied into message
+queues and want to get formatted inside the main logging process.
+
+`syslog` is now able to score by offloading the formatting work into the logging
+processes and by exchanging binaries with the internal logging process.
+
 <img src="https://cloud.githubusercontent.com/assets/404313/16836747/5f04b848-49bf-11e6-9c28-603eb66036f4.png" alt="large benchmark" />
 
-TODO explain results/findings
+Interestingly, the total duration is excellent for all frameworks. Most
+probably, copying the large terms makes the logging processes slow enough that
+`lager`'s backend throttling can kick in and prevent the internal message
+queue from growing too much. Again it could be observed that some senders were
+blocked over 10 seconds.
+
+TODO more details?
 
 History
 -------

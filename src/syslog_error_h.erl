@@ -17,7 +17,7 @@
 %%% An event handler to be attached to the `error_logger' event manager.
 %%%
 %%% The received messages will be formatted and forwarded to the
-%%% {@link syslog_logger} event manager.
+%%% {@link syslog_logger} server.
 %%%
 %%% @see syslog_monitor
 %%% @end

@@ -286,7 +286,14 @@ generate_loop(Fun, Millis) ->
 generate_loop(Fun, EndMillis, NumMessages) ->
     case EndMillis - current_millis() of
         LeftMillis when LeftMillis > 0 ->
-            ok = Fun(),
+            {Time, ok} = timer:tc(Fun),
+            if Time > 5000000 ->
+                    io:format(standard_error,
+                              "Sender blocked for ~wms!!!~n",
+                              [Time div 1000]);
+               true ->
+                    ok
+            end,
             generate_loop(Fun, EndMillis, NumMessages + 1);
         _ ->
             exit({ok, NumMessages})
