@@ -219,16 +219,17 @@ throughput and the completion time is almost equal. While memory consumption is
 generally low, the `lager` application uses significant more memory. This is due
 to the dynamic switching between synchronous and asynchronous message delivery:
 When delivery starts in asynchronous mode many log messages pile up in the
-loggers message queue. When the framework finally switches to synchronous mode
-the logger is busy sending out these messages while senders get blocked.
+internal `gen_event`'s message queue. When the framework finally switches to
+synchronous mode the event manager is busy sending out these messages while
+senders get blocked.
 
 <img src="https://cloud.githubusercontent.com/assets/404313/16836745/5af8562e-49bf-11e6-8ba0-89a99d1a73f5.png" alt="small benchmark" />
 
 Adding more processes to the party makes the above mentioned effect more
-dramatic. While `log4erl` and `syslog` perform quite well by evening the the
-load on the internal logger using synchronous logging, `lager` piles up a hugh
-amount of messages in the internal logger. It takes the framework almose two
-minutes to process these messages.
+dramatic. While `log4erl` and `syslog` perform quite well by evening the
+load on the internal event manager or server using synchronous logging, `lager`
+piles up a hugh amount of messages in its internal `gen_event` message queue. It
+takes the framework almost two minutes to process these messages.
 
 When looking at the memory usage it can be observed that `lager`'s backend
 throttling (which was also used in `syslog` up to this version) is effectively
@@ -240,19 +241,22 @@ the test it could be observed that some senders were blocked over 50 seconds!
 
 ### Large Profile
 
-Numbers get interesting when large strings need to be copied into message
-queues and want to get formatted inside the main logging process.
+Numbers get interesting when large strings need to be formatted and copied
+around. `log4erl` as well as `lager` do the actual message formatting inside
+the internal event managers. Additionally, these frameworks pass around the
+unprocessed format string and its argument list.
 
-`syslog` is now able to score by offloading the formatting work into the logging
-processes and by exchanging binaries with the internal logging process.
+`syslog` on the other hand, is now able to score by offloading the formatting
+work into the logging processes and by exchanging binaries with the internal
+logging server.
 
 <img src="https://cloud.githubusercontent.com/assets/404313/16836747/5f04b848-49bf-11e6-9c28-603eb66036f4.png" alt="large benchmark" />
 
 Interestingly, the total duration is excellent for all frameworks. Most
 probably, copying the large terms makes the logging processes slow enough that
-`lager`'s backend throttling can kick in and prevent the internal message
-queue from growing too much. Again it could be observed that some senders were
-blocked over 10 seconds.
+`lager`'s backend throttling can kick in and prevent the internal message queue
+from growing too much. However, it could be observed again that some senders
+were blocked over 10 seconds.
 
 TODO more details?
 
