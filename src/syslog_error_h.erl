@@ -118,6 +118,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 drop_msg(Msg, State = #state{msgs_to_drop = 0, dropped = Dropped}) ->
     {E, W, I} = drop_msg_(Msg, Dropped),
     Fmt = "dropped ~p errors, ~p warnings, ~p notices",
+    ?ERR(Fmt, [E, W, I]),
     log_msg(error, self(), Fmt, [E, W, I], State#state{dropped = {0, 0, 0}});
 drop_msg(Msg, State = #state{dropped = Dropped}) ->
     State#state{dropped = drop_msg_(Msg, Dropped)}.
