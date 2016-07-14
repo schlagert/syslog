@@ -14,9 +14,9 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% The main gen_event manager of the `syslog' application. All logged events
-%%% will be directed through this process. This module does also define a simple
-%%% event handler that sends incoming `iodata()' to the configured destination.
+%%% The main (backend) server of the `syslog' application. All logged events
+%%% will be directed into this process. The process itself is pretty simple, all
+%%% it does is sending incoming `iodata()' to the configured destination.
 %%%
 %%% This module also performs the formatting of messages into the configured
 %%% protocol format. Note that this is completely done in the calling (logging)
@@ -33,7 +33,7 @@
 %%%=============================================================================
 -module(syslog_logger).
 
--behaviour(gen_event).
+-behaviour(gen_server).
 
 %% API
 -export([start_link/0,
@@ -41,24 +41,25 @@
          maybe_log/5,
          set_log_level/1]).
 
-%% gen_event callbacks
+%% gen_server callbacks
 -export([init/1,
-         handle_event/2,
-         handle_call/2,
+         handle_cast/2,
+         handle_call/3,
          handle_info/2,
-         terminate/2,
-         code_change/3]).
+         code_change/3,
+         terminate/2]).
 
 -include("syslog.hrl").
 
--define(ASYNC_LIMIT, 30).
+-define(ASYNC, false).
 -define(DEST_HOST, {127, 0, 0, 1}).
 -define(DEST_PORT, 514).
 -define(FACILITY, ?SYSLOG_FACILITY).
 -define(PROTOCOL, rfc3164).
+-define(TIMEOUT, 1000).
 
 -record(opts, {
-          function       :: notify | sync_notify,
+          function       :: cast | {call, pos_integer()},
           log_level      :: 0..7,
           protocol       :: module(),
           facility       :: syslog:facility(),
@@ -86,19 +87,20 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Starts a registered gen_event manager.
+%% Starts a registered gen_server.
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
-    %% table creation will throw when event manager gets restarted
+    %% table creation will throw when server gets restarted
     catch ets:new(?MODULE, [named_table, public, {read_concurrency, true}]),
-    gen_event:start_link({local, ?MODULE}).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Forwards a pre-formatted message directly to all registered gen_event
-%% handlers. This is mainly used internally (e.g. by `syslog_error_h' or
+%% Forwards a pre-formatted message.
+%%
+%% This is mainly used internally (e.g. by `syslog_error_h' or
 %% `syslog_lager_backend'). This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
@@ -117,8 +119,7 @@ maybe_log(Severity, Pid, Timestamp, Msg) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Forwards a format message directly to all registered gen_event handlers. This
-%% function never fails.
+%% Forwards a format message. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
 -spec maybe_log(syslog:severity(),
@@ -143,66 +144,68 @@ maybe_log(Severity, Pid, Timestamp, Fmt, Args) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Set the log level to the given value.
+%% Change the log level to the given value.
 %% @end
 %%------------------------------------------------------------------------------
 -spec set_log_level(syslog:severity()) -> ok | {error, term()}.
-set_log_level(Level) -> gen_event:call(?MODULE, ?MODULE, {set_level, Level}).
+set_log_level(Level) ->
+    case catch map_severity(Level) of
+        I when is_integer(I) ->
+            case ets:update_element(?MODULE, opts, {#opts.log_level, I}) of
+                true  -> ok;
+                false -> {error, {not_running, syslog}}
+            end;
+        _ ->
+            {error, {bad_log_level, Level}}
+    end.
 
 %%%=============================================================================
-%%% gen_event callbacks
+%%% gen_server callbacks
 %%%=============================================================================
 
 -record(state, {
           socket    :: inet:socket(),
           dest_host :: inet:ip_address() | inet:hostname(),
-          dest_port :: inet:port_number(),
-          log_level :: 0..7}).
+          dest_port :: inet:port_number()}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init(_Arg) ->
+init([]) ->
     Opts = new_opts(syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)),
     {ok, Socket} = gen_udp:open(0, [binary]),
     State = #state{
                socket = Socket,
                dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST),
-               dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT),
-               log_level = Opts#opts.log_level},
+               dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT)},
     {ok, set_opts(Opts, State)}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event({log, Msg}, State) -> {ok, send(Msg, State)};
-handle_event(_, State)          -> {ok, State}.
+handle_call({log, Msg}, _From, State) ->
+    {reply, ok, send(Msg, State)};
+handle_call(_Request, _From, State) ->
+    {reply, undef, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_call({set_level, Level}, State = #state{log_level = OldLevel}) ->
-    case catch map_severity(Level) of
-        I when is_integer(I), Level =/= OldLevel ->
-            {ok, ok, set_level(State#state{log_level = I})};
-        I when is_integer(I) ->
-            {ok, ok, State};
-        _ ->
-            {ok, {error, {bad_log_level, Level}}, State}
-    end;
-handle_call(_Request, State) ->
-    {ok, undef, State}.
+handle_cast({log, Msg}, State) -> {noreply, send(Msg, State)};
+handle_cast(_Request, State)   -> {noreply, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp_closed, S}, #state{socket = S}) -> {error, {udp_closed, S}};
-handle_info(_Info, State)                        -> {ok, State}.
+handle_info({udp_closed, S}, State = #state{socket = S}) ->
+    {stop, {error, {udp_closed, S}}, State};
+handle_info(_Info, State) ->
+    {noreply, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Arg, #state{socket = Socket}) -> gen_udp:close(Socket).
+terminate(_Reason, #state{socket = Socket}) -> gen_udp:close(Socket).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -230,7 +233,8 @@ log(Severity, Pid, Timestamp, Msg, Opts) ->
       fun(<<>>) ->
               ok;
          (Message) ->
-              forward(PRI, HDR, msg(Message, Opts), Opts)
+              MSG = msg(Message, Opts),
+              forward(Msg, iolist_to_binary([PRI, HDR, MSG]), Opts)
       end, binary:split(iolist_to_binary(Msg), [<<"\n">>, <<"\r">>], [global])).
 
 %%------------------------------------------------------------------------------
@@ -257,21 +261,24 @@ msg(Msg, #opts{protocol = Protocol, cfg = Cfg}) -> Protocol:msg(Msg, Cfg).
 
 %%------------------------------------------------------------------------------
 %% @private
-%% The actual forwarding of the message to the `gen_event' manager.
+%% The actual forwarding of the message to the `gen_server'.
 %%------------------------------------------------------------------------------
-forward(PRI, HDR, MSG, #opts{function = Fun}) ->
+forward(Msg, Binary, #opts{function = {call, Timeout}}) ->
     try
-        gen_event:Fun(?MODULE, {log, iolist_to_binary([PRI, HDR, MSG])})
+        gen_server:call(?MODULE, {log, Binary}, Timeout)
     catch
-        exit:_ -> ?ERR("~ts~n", [MSG])
-    end.
+        exit:{noproc, _}  -> ?ERR("~ts~n", [Msg]);
+        exit:{timeout, _} -> ok %% message has been placed in mailbox
+    end;
+forward(_Msg, Binary, #opts{function = cast}) ->
+    gen_server:cast(?MODULE, {log, Binary}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 new_opts(Level) ->
     #opts{
-       function = get_function(),
+       function = get_function(syslog_lib:get_property(async, ?ASYNC)),
        log_level = map_severity(Level),
        protocol = get_protocol(),
        facility = syslog_lib:get_property(facility, ?FACILITY),
@@ -307,13 +314,6 @@ get_opts() ->
 %%------------------------------------------------------------------------------
 set_opts(Opts = #opts{}, State) ->
     true = ets:insert(?MODULE, Opts),
-    State.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-set_level(State = #state{log_level = Level}) ->
-    true = ets:update_element(?MODULE, opts, {#opts.log_level, Level}),
     State.
 
 %%------------------------------------------------------------------------------
@@ -371,11 +371,8 @@ get_protocol() ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_function() ->
-    case syslog_lib:get_property(async, false) of
-        true  -> notify;
-        false -> sync_notify
-    end.
+get_function(true)  -> cast;
+get_function(false) -> {call, syslog_lib:get_property(timeout, ?TIMEOUT)}.
 
 %%------------------------------------------------------------------------------
 %% @private

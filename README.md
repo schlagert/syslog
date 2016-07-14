@@ -24,7 +24,7 @@ there is no file or console backend, no custom-written and configurable log
 rotation, no line formatting and no tracing support. However, `syslog` does not
 rely on port drivers or NIFs to implement the Syslog protocol and it includes
 measures to enhance the overall robustness of a node, e.g. load distribution,
-throughput optimization, etc.
+back-pressure mechanisms, throughput optimization, etc.
 
 Features
 --------
@@ -126,17 +126,17 @@ are available and can be configured in the application environment:
 
 * `{async, boolean()}`
 
-  Specifies whether log message offloading into the `syslog_logger` event
-  manager is done synchronously or asynchronously. It is highly recommended
-  to leave this at its default value `false` because asynchronous delivery is
-  really dangerous. A simple log burst of a few thousand processes may be enough
+  Specifies whether log message offloading into the `syslog_logger` server
+  is done synchronously or asynchronously. It is highly recommended to leave
+  this at its default value `false` because asynchronous delivery is really
+  dangerous. A simple log burst of a few thousand processes may be enough
   to take your node down (due to out-of-memory).
 
 If your application really needs fast asynchronous logging and you like to live
 dangerously, logging can be done either with the `error_logger` or the `syslog`
-API and the `syslog` application should be configured with `{async, true}`. This
-sets `syslog` into asynchronous delivery mode and all message queues are
-allowed to grow indefinitely.
+API and the `syslog` application should be configured with `{async, true}` and
+`{msg_queue_limit, infinity}`. This sets `syslog` into asynchronous delivery
+mode and all message queues are allowed to grow indefinitely.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
 application startup. This has nothing to do with the standard SASL logging. It

@@ -56,23 +56,12 @@
 -type severity() :: emergency | alert | critical | error | warning | notice |
                     informational | debug | crash.
 
--type option() :: {dest_host, inet:ip_address() | inet:hostname()} |
-                  {dest_port, inet:port_number()} |
-                  {error_facility, facility()} |
-                  {facility, facility()} |
-                  {msg_queue_limit, Limit :: pos_integer() | infinity} |
-                  {protocol, rfc3164 | rfc5424} |
-                  {use_rfc5424_bom, boolean()} |
-                  {verbose, true | {false, Depth :: pos_integer()}} |
-                  {no_progress, boolean()}.
-
 -type proc_name() :: atom() | pid() | string().
 
 -type datetime() :: {calendar:datetime(), non_neg_integer()}.
 
 -export_type([facility/0,
               severity/0,
-              option/0,
               proc_name/0,
               datetime/0]).
 
@@ -216,7 +205,7 @@ stop(_State) -> ok.
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    Specs = [event_mgr(syslog_logger), server(syslog_monitor)],
+    Specs = [server(syslog_logger), server(syslog_monitor)],
     {ok, {{one_for_one, 5, 10}, Specs}}.
 
 %%%=============================================================================
@@ -227,11 +216,6 @@ init([]) ->
 %% @private
 %%------------------------------------------------------------------------------
 server(M) -> spec(M, [M]).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-event_mgr(M) -> spec(M, dynamic).
 
 %%------------------------------------------------------------------------------
 %% @private
