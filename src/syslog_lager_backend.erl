@@ -31,6 +31,9 @@
 
 -behaviour(gen_event).
 
+%% API
+-export([set_log_level/1]).
+
 %% gen_event callbacks
 -export([init/1,
          handle_event/2,
@@ -42,6 +45,22 @@
 -include("syslog.hrl").
 
 -define(CFG, [message]).
+
+%%%=============================================================================
+%%% API
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Set a specific log level for this lager backend, never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_log_level(syslog:severity() | info) -> ok.
+set_log_level(informational) ->
+    set_log_level(info);
+set_log_level(Level) ->
+    catch apply(lager, set_loglevel, [?MODULE, Level]),
+    ok.
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -85,11 +104,9 @@ handle_call(get_loglevel, State = #state{log_level = Level}) ->
     {ok, Level, State};
 handle_call({set_loglevel, Level}, State) ->
     try
-        ok = syslog:set_log_level(config_to_level(Level)),
         {ok, ok, State#state{log_level = level_to_mask(Level)}}
     catch
-        exit:{timeout, _} -> {ok, {error, timeout}, State};
-        _:_               -> {ok, {error, {bad_log_level, Level}}, State}
+        _:_ -> {ok, {error, {bad_log_level, Level}}, State}
     end;
 handle_call(_Request, State) ->
     {ok, undef, State}.
@@ -151,14 +168,4 @@ level_to_mask(Level) ->
         apply(lager_util, config_to_mask, [Level])
     catch
         error:undef -> apply(lager_util, level_to_num, [Level])
-    end.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-config_to_level(Config) ->
-    try
-        hd(apply(lager_util, config_to_levels, [Config]))
-    catch
-        error:undef when is_atom(Config) -> Config
     end.

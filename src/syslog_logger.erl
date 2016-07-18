@@ -153,8 +153,10 @@ set_log_level(Level) ->
     case catch map_severity(Level) of
         I when is_integer(I) ->
             case ets:update_element(?MODULE, opts, {#opts.log_level, I}) of
-                true  -> ok;
-                false -> {error, {not_running, syslog}}
+                true ->
+                    syslog_lager_backend:set_log_level(Level);
+                false ->
+                    {error, {not_running, syslog}}
             end;
         _ ->
             {error, {bad_log_level, Level}}
