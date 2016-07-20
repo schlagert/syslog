@@ -25,20 +25,27 @@
 monitor_test() ->
     process_flag(trap_exit, true),
 
-    ok = application:start(sasl),
-    ok = application:start(syslog),
+    ok = start(sasl),
+    ok = start(syslog),
 
     ?assert(has_hander(syslog_error_h, error_logger)),
     gen_event:delete_handler(error_logger, syslog_error_h, []),
     timer:sleep(500),
     ?assert(has_hander(syslog_error_h, error_logger)),
 
-    ok = application:stop(syslog),
-    ok = application:stop(sasl).
+    application:stop(syslog),
+    application:stop(sasl).
 
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+start(App) -> start(App, application:start(App)).
+start(_, ok) -> ok;
+start(App, {error, {already_started, App}}) -> ok.
 
 %%------------------------------------------------------------------------------
 %% @private

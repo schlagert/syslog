@@ -39,8 +39,8 @@
 
 -define(REGISTRATIONS,
         [
-         %% Manager      Handler
-         {error_logger,  syslog_error_h}
+         %% Manager     Handler
+         {error_logger, syslog_error_h}
         ]).
 
 -include("syslog.hrl").
