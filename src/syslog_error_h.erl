@@ -36,17 +36,18 @@
 
 -include("syslog.hrl").
 
--define(FACILITY,    ?SYSLOG_FACILITY).
--define(LIMIT,       infinity).
+-define(PERCENTAGE, 10).
+-define(FACILITY, ?SYSLOG_FACILITY).
+-define(LIMIT, infinity).
 -define(NO_PROGRESS, false).
--define(VERBOSITY,   true).
+-define(VERBOSITY, true).
 
 %% ** Generic server ... terminating
--define(SERVER_ERR, [$*,$*,32,$G,$e,$n,$e,$r,$i,$c,32,$s,$e,$r,$v,$e,$r,32 | _]).
+-define(SERVER_ERR, "** Generic server " ++ _).
 %% ** State machine ... terminating
--define(FSM_ERR,    [$*,$*,32,$S,$t,$a,$t,$e,32,$m,$a,$c,$h,$i,$n,$e,32 | _]).
+-define(FSM_ERR, "** State machine " ++ _).
 %% ** gen_event handler ... crashed
--define(EVENT_ERR,  [$*,$*,32,$g,$e,$n,$_,$e,$v,$e,$n,$t,32,$h,$a,$n,$d,$l,$e,$r,32 | _]).
+-define(EVENT_ERR, "** gen_event handler " ++ _).
 
 %%%=============================================================================
 %%% gen_event callbacks
@@ -58,6 +59,7 @@
           no_progress         :: boolean(),
           verbose             :: true | {false, pos_integer()},
           msg_queue_limit     :: pos_integer() | infinity,
+          drop_percentage     :: pos_integer(),
           extra_report        :: boolean()}).
 
 %%------------------------------------------------------------------------------
@@ -70,6 +72,7 @@ init(_Arg) ->
             no_progress     = syslog_lib:get_property(no_progress, ?NO_PROGRESS),
             verbose         = syslog_lib:get_property(verbose, ?VERBOSITY),
             msg_queue_limit = syslog_lib:get_property(msg_queue_limit, ?LIMIT),
+            drop_percentage = syslog_lib:get_property(drop_percentage, ?PERCENTAGE),
             extra_report    = Facility =/= CrashFacility}}.
 
 %%------------------------------------------------------------------------------
@@ -84,8 +87,11 @@ handle_event(Event, State = #state{msg_queue_limit = Limit}) ->
     case QueueLen - Limit of
         Len when Len =< 0 ->
             {ok, handle_msg(Event, State)};
+        Len when Limit < (100 div State#state.drop_percentage) ->
+            {ok, drop_msg(Event, State#state{msgs_to_drop = Len})};
         Len ->
-            {ok, drop_msg(Event, State#state{msgs_to_drop = Len})}
+            ToDrop = Len + (Limit div (100 div State#state.drop_percentage)),
+            {ok, drop_msg(Event, State#state{msgs_to_drop = ToDrop})}
     end.
 
 %%------------------------------------------------------------------------------
@@ -117,9 +123,8 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 drop_msg(Msg, State = #state{msgs_to_drop = 0, dropped = Dropped}) ->
     {E, W, I} = drop_msg_(Msg, Dropped),
-    Fmt = "dropped ~p errors, ~p warnings, ~p notices",
-    ?ERR(Fmt, [E, W, I]),
-    log_msg(error, self(), Fmt, [E, W, I], State#state{dropped = {0, 0, 0}});
+    ?ERR("~s DROPPED ~p errors, ~p warnings, ~p notices~n", [?MODULE, E, W, I]),
+    State#state{dropped = {0, 0, 0}};
 drop_msg(Msg, State = #state{dropped = Dropped}) ->
     State#state{dropped = drop_msg_(Msg, Dropped)}.
 drop_msg_({error, _, _}         , {E, W, I}) -> {E + 1, W, I};

@@ -94,29 +94,55 @@ rfc5424_test() ->
 
     teardown(Socket).
 
-log_level_test() ->
-    {ok, Socket} = setup(rfc5424, notice),
+log_level_test_() ->
+    {timeout,
+     5,
+     fun() ->
+             {ok, Socket} = setup(rfc5424, notice),
 
-    Pid = pid_to_list(self()),
-    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d(Z|(\\+|-)\\d\\d:\\d\\d)",
+             Pid = pid_to_list(self()),
+             Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d(Z|(\\+|-)\\d\\d:\\d\\d)",
 
-    ?assertEqual(ok, syslog:debug_msg("hello world")),
-    ?assertEqual(ok, syslog:info_msg("hello world")),
-    ?assertEqual(timeout, read(Socket)),
+             ?assertEqual(ok, syslog:debug_msg("hello world")),
+             ?assertEqual(ok, syslog:info_msg("hello world")),
+             ?assertEqual(timeout, read(Socket)),
 
-    ?assertEqual(ok, syslog:set_log_level(debug)),
+             ?assertEqual(ok, syslog:set_log_level(debug)),
 
-    ?assertEqual(ok, syslog:debug_msg("hello world")),
-    Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
+             ?assertEqual(ok, syslog:debug_msg("hello world")),
+             Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+             ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
-    teardown(Socket).
+             teardown(Socket)
+     end}.
+
+error_logger_test_() ->
+    {timeout,
+     5,
+     fun() ->
+             {ok, Socket} = setup(rfc3164, debug, 20),
+
+             erlang:suspend_process(whereis(error_logger)),
+
+             Send = fun(I) -> error_logger:info_msg("Message ~w", [I]) end,
+             ok = lists:foreach(Send, lists:seq(1, 30)),
+
+             erlang:resume_process(whereis(error_logger)),
+
+             Receive = fun(_) -> ?assert(is_list(read(Socket))) end,
+             ok = lists:foreach(Receive, lists:seq(1, 18)),
+             ?assertEqual(timeout, read(Socket)),
+
+             teardown(Socket)
+     end}.
 
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
 
-setup(Protocol, LogLevel) ->
+setup(Protocol, LogLevel) -> setup(Protocol, LogLevel, infinity).
+
+setup(Protocol, LogLevel, Limit) ->
     ?assertEqual(ok, application:start(sasl)),
     AppFile = filename:join(["..", "src", "syslog.app.src"]),
     {ok, [AppSpec]} = file:consult(AppFile),
@@ -125,6 +151,8 @@ setup(Protocol, LogLevel) ->
     ?assertEqual(ok, application:set_env(syslog, protocol, Protocol)),
     ?assertEqual(ok, application:set_env(syslog, crash_facility, local0)),
     ?assertEqual(ok, application:set_env(syslog, log_level, LogLevel)),
+    ?assertEqual(ok, application:set_env(syslog, msg_queue_limit, Limit)),
+    ?assertEqual(ok, application:set_env(syslog, no_progress, true)),
     ?assertEqual(ok, application:start(syslog)),
     ?assertEqual(ok, empty_mailbox()),
     gen_udp:open(?TEST_PORT, [binary]).
@@ -136,6 +164,8 @@ teardown(Socket) ->
     application:unset_env(syslog, protocol),
     application:unset_env(syslog, crash_facility),
     application:unset_env(syslog, log_level),
+    application:unset_env(syslog, msg_queue_limit),
+    application:unset_env(syslog, drop_percentage),
     gen_udp:close(Socket).
 
 load(App) -> load(App, application:load(App)).

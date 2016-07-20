@@ -63,6 +63,16 @@ are available and can be configured in the application environment:
   message queue. If the message queue exceeds this limit `syslog` will
   __drop the events exceeding the limit__. Default is `infinity`.
 
+* `{drop_percentage, Percentage :: 1..100}`
+
+  Specifies the number of messages that will be dropped (additionally), if the
+  `error_logger` message queue exceeds the configured `msg_queue_limit`. The
+  `drop_percentage` is given as percentage (of the `msg_queue_limit`). E.g. if
+  `drop_percentage` is `10` (the default), `msg_queue_limit` is `100` and the
+  current length of the `error_logger` message queue is 120, then `20 + 10`
+  messages will be dropped to give the `syslog_error_h` handler some air to
+  catch up.
+
 * `{protocol, rfc3164 | rfc5424}`
 
   Specifies which protocol standard should be used to format outgoing Syslog
@@ -266,8 +276,8 @@ History
 ### Master
 
 * Remove dynamic switching of log message delivery mode. Make mode explicitly
-  configurable with the new `async` directive and the `syslog:set_log_mode/1`
-  API.
+  configurable with the new `async` directive (which replaces the `async_limit`
+  directive) and the `syslog:set_log_mode/1` API.
 * Add `app_name` configuration directive to allow configuration of the
   `APP-NAME` field value (thanks to @comtihon).
 * Change severity of messages sent by `error_logger:info_[msg|report]/1,2` and
