@@ -214,12 +214,20 @@ log_crash(false, Pid, Report, State) ->
 log_crash(true, Pid, Report = [SubReport | _], State) ->
     NewState = log_crash(false, Pid, Report, State),
     try proplists:get_value(error_info, SubReport) of
-        {Class, {Reason, Stack}, _} when is_list(Stack) ->
+        {Class, {Reason, [{M, F, A, []} | _]}, _} ->
+            log_msg(error, Pid, "exited with ~w at ~s:~s/~w",
+                    [{Class, Reason}, M, F, A], NewState);
+        {Class, {Reason, [{M, Fu, A, [{file, Fi}, {line, L} | _]} | _]}, _} ->
+            log_msg(error, Pid, "exited with ~w at ~s:~s/~w (~s:~w)",
+                    [{Class, Reason}, M, Fu, A, Fi, L], NewState);
+        {Class, {Reason, []}, _} ->
             log_msg(error, Pid, "exited with ~w", [{Class, Reason}], NewState);
         {Class, Reason, _} ->
             log_msg(error, Pid, "exited with ~w", [{Class, Reason}], NewState);
         _ ->
             log_msg(error, Pid, "exited with ~w", [SubReport], NewState)
     catch
-        _:_ -> log_msg(error, Pid, "exited with ~w", [SubReport], NewState)
+        _:_ ->
+            ?ERR("~w exited with ~w~n", [Pid, SubReport]),
+            NewState
     end.

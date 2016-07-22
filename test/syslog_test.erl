@@ -23,6 +23,13 @@
 -define(TEST_PORT, 31337).
 -define(TIMEOUT,   100).
 
+-define(RFC3164_DATE, "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\\s|\\d)\\d").
+-define(RFC3164_TIME, "\\d\\d:\\d\\d:\\d\\d").
+
+-define(RFC5424_DATE, "\\d\\d\\d\\d-\\d\\d-\\d\\d").
+-define(RFC5424_TIME, "T\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d").
+-define(RFC5424_ZONE, "(Z|(\\+|-)\\d\\d:\\d\\d)").
+
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
@@ -30,67 +37,66 @@
 rfc3164_test() ->
     {ok, Socket} = setup(rfc3164, debug),
 
-    Pid = pid_to_list(self()),
-    Month = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
-    Date = Month ++ " (\\s|\\d)\\d \\d\\d:\\d\\d:\\d\\d",
+    Proc = pid_to_list(self()),
+    Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<30>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
+    Re1 = "<30>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re1)),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re2)),
+    Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    Re3 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+    Re3 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
-    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+    ?assertEqual(ok, expect(Socket, Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
-    Re4 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello",
-    ?assertMatch({match, _}, re:run(read(Socket), Re4)),
-    Re5 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re5)),
+    Re4 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello",
+    ?assertEqual(ok, expect(Socket, Re4)),
+    Re5 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - world",
+    ?assertEqual(ok, expect(Socket, Re5)),
 
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
-    Re6 = "<131>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re6)),
+    Re6 = "<131>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re6)),
 
     teardown(Socket).
 
 rfc5424_test() ->
     {ok, Socket} = setup(rfc5424, debug),
 
-    Pid = pid_to_list(self()),
-    Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d(Z|(\\+|-)\\d\\d:\\d\\d)",
+    Proc = pid_to_list(self()),
+    Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
-    Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re1)),
+    Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re1)),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
-    Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re2)),
+    Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
-    Re3 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+    Re3 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
-    ?assertMatch({match, _}, re:run(read(Socket), Re3)),
+    ?assertEqual(ok, expect(Socket, Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
-    Re4 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello",
-    ?assertMatch({match, _}, re:run(read(Socket), Re4)),
-    Re5 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re5)),
+    Re4 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello",
+    ?assertEqual(ok, expect(Socket, Re4)),
+    Re5 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - world",
+    ?assertEqual(ok, expect(Socket, Re5)),
 
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
-    Re6 = "<131>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
-    ?assertMatch({match, _}, re:run(read(Socket), Re6)),
+    Re6 = "<131>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
+    ?assertEqual(ok, expect(Socket, Re6)),
 
     teardown(Socket).
 
@@ -100,8 +106,8 @@ log_level_test_() ->
      fun() ->
              {ok, Socket} = setup(rfc5424, notice),
 
-             Pid = pid_to_list(self()),
-             Date = "\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d(Z|(\\+|-)\\d\\d:\\d\\d)",
+             Proc = pid_to_list(self()),
+             Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
 
              ?assertEqual(ok, syslog:debug_msg("hello world")),
              ?assertEqual(ok, syslog:info_msg("hello world")),
@@ -110,7 +116,8 @@ log_level_test_() ->
              ?assertEqual(ok, syslog:set_log_level(debug)),
 
              ?assertEqual(ok, syslog:debug_msg("hello world")),
-             Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Pid ++ " - hello world",
+             Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ "
+                 ++ Proc ++ " - hello world",
              ?assertMatch({match, _}, re:run(read(Socket), Re1)),
 
              teardown(Socket)
@@ -121,6 +128,8 @@ error_logger_test_() ->
      5,
      fun() ->
              {ok, Socket} = setup(rfc3164, debug, 20),
+
+             %% test message queue limit and drop percentage
 
              erlang:suspend_process(whereis(error_logger)),
 
@@ -133,6 +142,16 @@ error_logger_test_() ->
              ok = lists:foreach(Receive, lists:seq(1, 18)),
              ?assertEqual(timeout, read(Socket)),
 
+             %% test (extra) crash_report
+
+             Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
+             Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
+             Proc = pid_to_list(Pid),
+
+             Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
+                 Proc ++ " - exited with {exit,test_reason}",
+             ?assertEqual(ok, wait_for(Socket, Re)),
+
              teardown(Socket)
      end}.
 
@@ -140,8 +159,14 @@ error_logger_test_() ->
 %%% internal functions
 %%%=============================================================================
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 setup(Protocol, LogLevel) -> setup(Protocol, LogLevel, infinity).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 setup(Protocol, LogLevel, Limit) ->
     ?assertEqual(ok, application:start(sasl)),
     AppFile = filename:join(["..", "src", "syslog.app.src"]),
@@ -155,8 +180,11 @@ setup(Protocol, LogLevel, Limit) ->
     ?assertEqual(ok, application:set_env(syslog, no_progress, true)),
     ?assertEqual(ok, application:start(syslog)),
     ?assertEqual(ok, empty_mailbox()),
-    gen_udp:open(?TEST_PORT, [binary]).
+    gen_udp:open(?TEST_PORT, [list]).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 teardown(Socket) ->
     application:stop(syslog),
     application:stop(sasl),
@@ -168,15 +196,47 @@ teardown(Socket) ->
     application:unset_env(syslog, drop_percentage),
     gen_udp:close(Socket).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 load(App) -> load(App, application:load(App)).
 load(_, ok) -> ok;
 load(App, {error, {already_loaded, App}}) -> ok.
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+wait_for(Socket, Pattern) ->
+    case expect(Socket, Pattern) of
+        {nomatch, _, _} -> wait_for(Socket, Pattern);
+        Other           -> Other
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+expect(Socket, Pattern) ->
+    case read(Socket) of
+        L when is_list(L) ->
+            case re:run(L, Pattern) of
+                {match, _} -> ok;
+                _          -> {nomatch, L, Pattern}
+            end;
+        Other ->
+            Other
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 read(Socket) ->
     receive
-        {udp, Socket, _, _, Bin} -> binary_to_list(Bin)
+        {udp, Socket, _, _, L} -> L
     after
         500 -> timeout
     end.
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 empty_mailbox() -> receive _ -> empty_mailbox() after ?TIMEOUT -> ok end.
