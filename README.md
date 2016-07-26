@@ -29,10 +29,14 @@ back-pressure mechanisms, throughput optimization, etc.
 Features
 --------
 
-* Log messages and standard `error_logger` reports according to RFC 3164
-  (BSD Syslog) or RFC 5424 (Syslog Protocol) without the need for drivers,
-  ports or NIFs.
-* System independent logging to local or remote facilities using UDP.
+* Log messages and standard `error_logger` reports formatted according to
+  RFC 3164 (BSD Syslog) or RFC 5424 (Syslog Protocol) without the need for
+  drivers, ports or NIFs.
+* System independent logging to local or remote facilities using one of the
+  following transports:
+  * UDP (RFC 3164 and RFC 5426)
+  * TCP (Octet Counting according to RFC 6587)
+  * TCP/TLS (RFC 5425)
 * Robust event handlers - using supervised event handler subscription.
 * Optionally independent error messages using a separate facility.
 * Get the well-known SASL event format for `supervisor` and `crash` reports.
@@ -73,10 +77,16 @@ are available and can be configured in the application environment:
   messages will be dropped to give the `syslog_error_h` handler some air to
   catch up.
 
-* `{protocol, rfc3164 | rfc5424}`
+* `{protocol, rfc3164 | rfc5424 |
+              {rfc3164 | rfc5424, tcp | udp} |
+              {rfc3164 | rfc5424, udp, [gen_udp:option()]} |
+              {rfc3164 | rfc5424, tcp, [gen_tcp:option()]} |
+              {rfc5424, tls, [ssl:connect_option()]}}`
 
-  Specifies which protocol standard should be used to format outgoing Syslog
-  packets. Default is `rfc3164`.
+  Specifies which protocol/transport standard should be used to format and send
+  outgoing Syslog packets. Please note that empty/default TLS/SSL options are
+  currently not supported. Default formatting is `rfc3164` and the default
+  transport is `udp`.
 
 * `{use_rfc5424_bom, boolean()}`
 
