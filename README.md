@@ -133,6 +133,17 @@ are available and can be configured in the application environment:
   and no more overflow processes available. Default is `false`. Recommended to use with
   high `max_overflow` value.
   
+* `{no_sync_rq_ttl, integer()}`:
+
+  Number of milliseconds to wait for udp sender is available for log sending before crash
+  with timeout. Default is 5000 (5 sec).
+  
+* `{switch_no_queue, boolean()}`:
+
+  Switch to `{no_queue, true}` mode to drop all queued messages, which can not be sent now if timeout
+  on log sending occurred. After all messages in current msgbox will be sent or dropped - return
+  to `{no_queue, false}`
+  
 * `{appname, string()}`:
 
   Application name, reported to syslog. Default is `node()`.

@@ -32,11 +32,11 @@
 
 %% gen_event callbacks
 -export([init/1,
-         handle_event/2,
-         handle_call/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+  handle_event/2,
+  handle_call/2,
+  handle_info/2,
+  terminate/2,
+  code_change/3]).
 
 -include("syslog.hrl").
 
@@ -55,48 +55,52 @@
 %%%=============================================================================
 
 -record(state, {
-          log_level       :: non_neg_integer(),
-          no_queue        :: boolean(),
-          hibernate_timer :: timer:tref() | undefined,
-          protocol        :: module(),
-          facility        :: syslog:facility(),
-          crash_facility  :: syslog:facility(),
-          hostname        :: string(),
-          domain          :: string(),
-          appname         :: string(),
-          beam_pid        :: string(),
-          bom             :: binary()}).
+  log_level :: non_neg_integer(),
+  no_queue :: boolean(),
+  sync_rq_ttl :: integer(),
+  switch_no_queue :: boolean(),
+  hibernate_timer :: timer:tref() | undefined,
+  protocol :: module(),
+  facility :: syslog:facility(),
+  crash_facility :: syslog:facility(),
+  hostname :: string(),
+  domain :: string(),
+  appname :: string(),
+  beam_pid :: string(),
+  bom :: binary()}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
-    {ok, #state{
-            log_level       = map_severity(syslog_lib:get_property(log_level, debug)),
-            no_queue        = syslog_lib:get_property(no_queue, false),
-            protocol        = get_protocol(),
-            facility        = syslog_lib:get_property(facility, ?FACILITY),
-            crash_facility  = syslog_lib:get_property(crash_facility, ?FACILITY),
-            hostname        = syslog_lib:get_hostname(),
-            domain          = syslog_lib:get_domain(),
-            appname         = syslog_lib:get_name(),
-            beam_pid        = os:getpid(),
-            bom             = get_bom()}}.
+  {ok, #state{
+    log_level = map_severity(syslog_lib:get_property(log_level, debug)),
+    no_queue = syslog_lib:get_property(no_queue, false),
+    sync_rq_ttl = syslog_lib:get_property(sync_rq_ttl, 5000),
+    switch_no_queue = syslog_lib:get_property(switch_no_queue, false),
+    protocol = get_protocol(),
+    facility = syslog_lib:get_property(facility, ?FACILITY),
+    crash_facility = syslog_lib:get_property(crash_facility, ?FACILITY),
+    hostname = syslog_lib:get_hostname(),
+    domain = syslog_lib:get_domain(),
+    appname = syslog_lib:get_name(),
+    beam_pid = os:getpid(),
+    bom = get_bom()}}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 handle_event({log, Timestamp, Severity, Pid, Msg}, State = #state{log_level = Level}) ->
-    SeverityNum = map_severity(Severity),
-    case SeverityNum > Level of
-      true ->
-        {ok, State};
-      false ->
-        send(get_report(Timestamp, SeverityNum, Pid, Msg, State), State),
-        {ok, need_timer(Msg, State)}
-    end;
+  SeverityNum = map_severity(Severity),
+  case SeverityNum > Level of
+    true ->
+      {ok, State};
+    false ->
+      NoQueue = send(get_report(Timestamp, SeverityNum, Pid, Msg, State), State),
+      {ok, need_timer(Msg, State#state{no_queue = NoQueue})}
+  end;
 handle_event(_, State) ->
-    {ok, State}.
+  {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -106,6 +110,8 @@ handle_call(_Request, State) -> {ok, undef, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+handle_info({no_queue, Value}, State) ->
+  {ok, State#state{no_queue = Value}};
 handle_info(hibernate, State) ->
   {ok, State#state{hibernate_timer = undefined}, hibernate};
 handle_info(_Info, State) ->
@@ -138,83 +144,93 @@ need_timer(_, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_report(Timestamp, Severity, Pid, Msg, State) ->
-    #syslog_report{
-       severity  = Severity,
-       facility  = severity_to_facility(Severity, State),
-       timestamp = Timestamp,
-       pid       = Pid,
-       hostname  = State#state.hostname,
-       domain    = State#state.domain,
-       appname   = State#state.appname,
-       beam_pid  = State#state.beam_pid,
-       bom       = State#state.bom,
-       msg       = Msg}.
+  #syslog_report{
+    severity = Severity,
+    facility = severity_to_facility(Severity, State),
+    timestamp = Timestamp,
+    pid = Pid,
+    hostname = State#state.hostname,
+    domain = State#state.domain,
+    appname = State#state.appname,
+    beam_pid = State#state.beam_pid,
+    bom = State#state.bom,
+    msg = Msg}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send(Report, #state{protocol = Protocol, no_queue = false}) ->
-  syslog_udp_sup:send(Report, Protocol);
+send(Report, #state{protocol = Protocol, no_queue = false, sync_rq_ttl = Timeout, switch_no_queue = false}) ->
+  syslog_udp_sup:send(Report, Protocol, Timeout),
+  false;
+send(Report, #state{protocol = Protocol, no_queue = false, sync_rq_ttl = Timeout, switch_no_queue = true}) ->
+  try syslog_udp_sup:send(Report, Protocol, Timeout) of
+    _ -> false
+  catch
+    exit:{timeout, {gen_server, call, [test, {checkout, _, true}, _]}} -> %check no queue on to drop some messages
+      erlang:send(self(), {no_queue, false}),
+      true
+  end;
 send(Report, #state{protocol = Protocol, no_queue = true}) ->
-  syslog_udp_sup:send_if_available(Report, Protocol).
+  syslog_udp_sup:send_if_available(Report, Protocol),
+  true.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_protocol()        -> get_protocol(syslog_lib:get_property(protocol, ?PROTOCOL)).
+get_protocol() -> get_protocol(syslog_lib:get_property(protocol, ?PROTOCOL)).
 get_protocol(rfc5424) -> syslog_rfc5424;
 get_protocol(rfc3164) -> syslog_rfc3164.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_bom()           -> get_bom(syslog_lib:get_property(use_rfc5424_bom, false)).
+get_bom() -> get_bom(syslog_lib:get_property(use_rfc5424_bom, false)).
 get_bom({ok, true}) -> unicode:encoding_to_bom(utf8);
-get_bom(_)          -> <<>>.
+get_bom(_) -> <<>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 severity_to_facility(?CRASH, #state{crash_facility = F}) -> map_facility(F);
-severity_to_facility(_,     #state{facility = F})       -> map_facility(F).
+severity_to_facility(_, #state{facility = F}) -> map_facility(F).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-map_facility(kernel)   -> 0;
-map_facility(kern)     -> 0;
-map_facility(mail)     -> 2;
-map_facility(daemon)   -> 3;
-map_facility(auth)     -> 4;
-map_facility(syslog)   -> 5;
-map_facility(lpr)      -> 6;
-map_facility(news)     -> 7;
-map_facility(uucp)     -> 8;
-map_facility(cron)     -> 9;
+map_facility(kernel) -> 0;
+map_facility(kern) -> 0;
+map_facility(mail) -> 2;
+map_facility(daemon) -> 3;
+map_facility(auth) -> 4;
+map_facility(syslog) -> 5;
+map_facility(lpr) -> 6;
+map_facility(news) -> 7;
+map_facility(uucp) -> 8;
+map_facility(cron) -> 9;
 map_facility(authpriv) -> 10;
-map_facility(ftp)      -> 11;
-map_facility(ntp)      -> 12;
+map_facility(ftp) -> 11;
+map_facility(ntp) -> 12;
 map_facility(logaudit) -> 13;
 map_facility(logalert) -> 14;
-map_facility(clock)    -> 15;
-map_facility(local0)   -> 16;
-map_facility(local1)   -> 17;
-map_facility(local2)   -> 18;
-map_facility(local3)   -> 19;
-map_facility(local4)   -> 20;
-map_facility(local5)   -> 21;
-map_facility(local6)   -> 22;
-map_facility(local7)   -> 23.
+map_facility(clock) -> 15;
+map_facility(local0) -> 16;
+map_facility(local1) -> 17;
+map_facility(local2) -> 18;
+map_facility(local3) -> 19;
+map_facility(local4) -> 20;
+map_facility(local5) -> 21;
+map_facility(local6) -> 22;
+map_facility(local7) -> 23.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-map_severity(?EMERGENCY)     -> 0;
-map_severity(?ALERT)         -> 1;
-map_severity(?CRITICAL)      -> 2;
-map_severity(?ERROR)         -> 3;
-map_severity(?CRASH)         -> 3;
-map_severity(?WARNING)       -> 4;
-map_severity(?NOTICE)        -> 5;
+map_severity(?EMERGENCY) -> 0;
+map_severity(?ALERT) -> 1;
+map_severity(?CRITICAL) -> 2;
+map_severity(?ERROR) -> 3;
+map_severity(?CRASH) -> 3;
+map_severity(?WARNING) -> 4;
+map_severity(?NOTICE) -> 5;
 map_severity(?INFORMATIONAL) -> 6;
-map_severity(?DEBUG)         -> 7.
+map_severity(?DEBUG) -> 7.

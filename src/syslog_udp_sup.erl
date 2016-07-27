@@ -27,7 +27,7 @@
 -include("syslog.hrl").
 
 %% API
--export([start_link/0, send/2, return_worker/0, send_if_available/2, status/0]).
+-export([start_link/0, send/3, return_worker/0, send_if_available/2, status/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -41,8 +41,8 @@
 %% Request worker (may create new, if overflow specified) and order him
 %% to send report. Worker will do checkin itself.
 %% If no workers available - wait for worker.
-send(Report, Protocol) ->
-  Worker = poolboy:checkout(?SENDER_POOL),
+send(Report, Protocol, Timeout) ->
+  Worker = poolboy:checkout(?SENDER_POOL, true, Timeout),
   Worker ! {send, Report, Protocol},
   ok.
 
