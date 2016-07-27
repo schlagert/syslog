@@ -120,7 +120,7 @@ are available and can be configured in the application environment:
   
 * `{pool_conf, proplist()}`:
 
-  Specifies the configuration of udp pool senders. `pool_size` - number of workers
+  Specifies the configuration of udp pool senders. `size` - number of workers
   in a pool. `max_overflow` - number of workers to be created when base workers are
   busy. `overflow_ttl` - number of milliseconds to keep created overflow workers,
   `overflow_check_period` - period in milliseconds to check for overflow workers ttl.
