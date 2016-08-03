@@ -6,6 +6,7 @@
 *.svg
 .eunit
 .rebar
+_build
 benchmark/lager
 benchmark/log
 benchmark/log4erl

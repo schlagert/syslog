@@ -200,9 +200,7 @@ setup(Protocol, tcp, LogLevel, Limit) ->
 %%------------------------------------------------------------------------------
 setup_apps(Protocol, LogLevel, Limit) ->
     ok = application:start(sasl),
-    AppFile = filename:join(["..", "src", "syslog.app.src"]),
-    {ok, [AppSpec]} = file:consult(AppFile),
-    ok = load(AppSpec),
+    ok = load(syslog),
     ok = application:set_env(syslog, dest_port, ?TEST_PORT),
     ok = application:set_env(syslog, protocol, Protocol),
     ok = application:set_env(syslog, crash_facility, local0),

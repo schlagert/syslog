@@ -14,13 +14,18 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
 {application, syslog,
-  [{description, "A Syslog based logger for error_logger reports."},
-   {id, "com.github.schlagert"},
-   {vsn, "3.0.0"},
-   {registered,
-    [
-     syslog_logger
-    ]},
-   {applications, [kernel, stdlib, sasl]},
-   {mod, {syslog, []}},
-   {env, []}]}.
+ [
+  {description, "A Syslog-based logging framework."},
+  {vsn, "3.0.0"},
+  {registered,
+   [
+    syslog_logger
+   ]},
+  {applications, [kernel, stdlib, sasl]},
+  {mod, {syslog, []}},
+  {env, []},
+  {maintainers, ["Tobias Schlager"]},
+  {licenses, ["MIT"]},
+  {links, [{"Github", "https://github.com/schlagert/syslog"}]},
+  {pkg_name, syslog_app}
+ ]}.

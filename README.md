@@ -3,7 +3,7 @@ syslog
 
 [![Build Status](https://travis-ci.org/schlagert/syslog.png?branch=master)](https://travis-ci.org/schlagert/syslog)
 
-A Syslog based logging framework for Erlang. This project is inspired by the
+A Syslog-based logging framework for Erlang. This project is inspired by the
 great work put in the two projects
 [sasl_syslog](http://github.com/travelping/sasl_syslog) and
 [lager](http://github.com/basho/lager). In fact `syslog` tries to combine both
@@ -285,6 +285,14 @@ History
 
 ### Master
 
+* No difference to latest tag
+
+### 3.0.0
+
+* `syslog` is now available on [hex.pm](https://hex.pm/packages/syslog_app)
+  under the package name `syslog_app` (the name `syslog` is already assigned to
+  another project)
+* Make project compatible to rebar3
 * Remove dynamic switching of log message delivery mode. Make mode explicitly
   configurable with the new `async` directive (which replaces the `async_limit`
   directive) and the `syslog:set_log_mode/1` API.
