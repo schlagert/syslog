@@ -23,7 +23,7 @@
 -behaviour(syslog_logger).
 
 %% API
--export([hdr/3, msg/2]).
+-export([hdr/3, msg/2, get_date/1, truncate/2]).
 
 -include("syslog.hrl").
 
