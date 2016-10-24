@@ -159,7 +159,7 @@ truncate(L, S) when is_binary(S)   -> binary:part(S, 0, L).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns a truncated string.
+%% Returns a formated timestamp for the syslog datetime object (UTC).
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_date(syslog:datetime()) -> list().
