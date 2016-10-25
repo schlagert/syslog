@@ -29,7 +29,8 @@
          get_utc_datetime/1,
          get_utc_offset/2,
          truncate/2,
-         get_date/1]).
+         format_rfc3164_date/1,
+         format_rfc5424_date/1]).
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
 
@@ -144,37 +145,47 @@ get_utc_offset(Utc, Local) ->
     {0, {H, Mi, 0}} = time_difference(Local, Utc),
     {$-, H, Mi}.
 
-
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns a truncated string.
+%% Returns a truncated string with at most `Len' characters/bytes.
 %% @end
 %%------------------------------------------------------------------------------
 -spec truncate(pos_integer(), string() | binary()) -> string() | binary().
-
-truncate(L, S) when length(S) =< L -> S;
-truncate(L, S) when size(S) =< L   -> S;
-truncate(L, S) when is_list(S)     -> string:substr(S, 1, L);
-truncate(L, S) when is_binary(S)   -> binary:part(S, 0, L).
+truncate(Len, Str) when length(Str) =< Len -> Str;
+truncate(Len, Str) when size(Str) =< Len   -> Str;
+truncate(Len, Str) when is_list(Str)       -> string:substr(Str, 1, Len);
+truncate(Len, Str) when is_binary(Str)     -> binary:part(Str, 0, Len).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns a formated timestamp for the syslog datetime object (UTC).
+%% Formats a (UTC) timestamp according to RFC5424. The returned timestamp will
+%% be in local time with UTC offset (if available).
 %% @end
 %%------------------------------------------------------------------------------
--spec get_date(syslog:datetime()) -> list().
-
-get_date({UtcDatetime, MicroSecs}) ->
+-spec format_rfc5424_date(syslog:datetime()) -> iodata().
+format_rfc5424_date({UtcDatetime, MicroSecs}) ->
     LocaDatetime = erlang:universaltime_to_localtime(UtcDatetime),
-    get_date(LocaDatetime, UtcDatetime, MicroSecs).
-get_date(Utc = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
+    format_rfc5424_date(LocaDatetime, UtcDatetime, MicroSecs).
+format_rfc5424_date(Utc = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
     [integer_to_list(Y), $-, digit(Mo), $-, digit(D), $T,
      digit(H), $:, digit(Mi), $:, digit(S), $., micro(Micro), $Z];
-get_date(Local = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
-    {Sign, OH, OMi} = syslog_lib:get_utc_offset(Utc, Local),
+format_rfc5424_date(Local = {{Y, Mo, D}, {H, Mi, S}}, Utc, Micro) ->
+    {Sign, OH, OMi} = get_utc_offset(Utc, Local),
     [integer_to_list(Y), $-, digit(Mo), $-, digit(D), $T,
      digit(H), $:, digit(Mi), $:, digit(S), $., micro(Micro),
      Sign, digit(OH), $:, digit(OMi)].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Formats a (UTC) timestamp according to RFC3164. The returned timestamp will
+%% be in local time.
+%% @end
+%%------------------------------------------------------------------------------
+-spec format_rfc3164_date(syslog:datetime()) -> iodata().
+format_rfc3164_date({UtcDatetime, _MicroSecs}) ->
+    format_rfc3164_date_(erlang:universaltime_to_localtime(UtcDatetime)).
+format_rfc3164_date_({{_, Mo, D}, {H, Mi, S}}) ->
+    [month(Mo), " ", day(D), " ", digit(H), $:, digit(Mi), $:, digit(S)].
 
 %%%=============================================================================
 %%% internal functions
@@ -239,6 +250,36 @@ time_difference(T1, T2) ->
     calendar:seconds_to_daystime(
       calendar:datetime_to_gregorian_seconds(T2) -
           calendar:datetime_to_gregorian_seconds(T1)).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+month(1)  -> "Jan";
+month(2)  -> "Feb";
+month(3)  -> "Mar";
+month(4)  -> "Apr";
+month(5)  -> "May";
+month(6)  -> "Jun";
+month(7)  -> "Jul";
+month(8)  -> "Aug";
+month(9)  -> "Sep";
+month(10) -> "Oct";
+month(11) -> "Nov";
+month(12) -> "Dec".
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+day(1)  -> " 1";
+day(2)  -> " 2";
+day(3)  -> " 3";
+day(4)  -> " 4";
+day(5)  -> " 5";
+day(6)  -> " 6";
+day(7)  -> " 7";
+day(8)  -> " 8";
+day(9)  -> " 9";
+day(N)  -> integer_to_list(N).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -313,9 +354,16 @@ truncate_test() ->
     ?assertEqual(<<"123">>, truncate(3, <<"123">>)),
     ?assertEqual(<<"123">>, truncate(4, <<"123">>)).
 
-get_date_test() ->
+format_rfc3164_date_test() ->
     Datetime = {{{2013,4,6},{21,20,56}},908235},
+    Date = format_rfc3164_date(Datetime),
+    Rx = "Apr  6 \\d\\d:20:56",
+    ?assertMatch({match, _}, re:run(lists:flatten(Date), Rx)).
+
+format_rfc5424_date_test() ->
+    Datetime = {{{2013,4,6},{21,20,56}},908235},
+    Date = format_rfc5424_date(Datetime),
     Rx = "2013-04-06T\\d\\d:\\d\\d:56\\.908235(Z|(\\+|-)\\d\\d:\\d\\d)",
-    ?assertMatch({match, _}, re:run(lists:flatten(get_date(Datetime)), Rx)).
+    ?assertMatch({match, _}, re:run(lists:flatten(Date), Rx)).
 
 -endif. %% TEST

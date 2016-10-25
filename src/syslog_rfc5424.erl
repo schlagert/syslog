@@ -43,7 +43,7 @@
 hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
     [
      ?VERSION, $\s,
-     syslog_lib:get_date(Datetime), $\s,
+     syslog_lib:format_rfc5424_date(Datetime), $\s,
      syslog_lib:truncate(255, H), $\s,
      syslog_lib:truncate(48, A), $\s,
      syslog_lib:truncate(128, B), $\s,
@@ -56,6 +56,4 @@ hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec msg(binary(), #syslog_cfg{}) -> binary().
-msg(Msg, #syslog_cfg{bom = Bom}) ->
-    unicode:characters_to_binary([Bom, Msg]).
-
+msg(Msg, #syslog_cfg{bom = Bom}) -> unicode:characters_to_binary([Bom, Msg]).

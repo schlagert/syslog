@@ -285,7 +285,8 @@ History
 
 ### Master
 
-* No difference to latest tag
+* Allow configuration of custom protocol backend modules (thanks to @rich)
+* Export/move date formatting code into `syslog_lib` (thanks to @rich)
 
 ### 3.0.0
 
