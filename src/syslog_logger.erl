@@ -423,7 +423,7 @@ get_protocol({P, _, _}) when is_atom(P) -> get_protocol(P);
 get_protocol({P, _}) when is_atom(P)    -> get_protocol(P);
 get_protocol(rfc5424)                   -> syslog_rfc5424;
 get_protocol(rfc3164)                   -> syslog_rfc3164;
-get_protocol(P)                         -> P.
+get_protocol(P) when is_atom(P)         -> P.
 
 %%------------------------------------------------------------------------------
 %% @private
