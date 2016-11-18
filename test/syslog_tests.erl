@@ -14,7 +14,7 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
 
--module(syslog_test).
+-module(syslog_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 
