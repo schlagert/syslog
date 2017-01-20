@@ -191,8 +191,12 @@ set_log_function(Function) ->
 %%% gen_server callbacks
 %%%=============================================================================
 
+-type device() :: standard_io |
+                  standard_error |
+                  {module(), inet:socket() | io:device()}.
+
 -record(state, {
-          socket    :: {module(), inet:socket()},
+          device    :: device(),
           dest_host :: inet:ip_address() | inet:hostname(),
           dest_port :: inet:port_number()}).
 
@@ -224,15 +228,15 @@ handle_cast(_Request, State)   -> {noreply, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp_closed, S}, State = #state{socket = {_, S}}) ->
-    {stop, {error, {udp_closed, S}}, State#state{socket = undefined}};
-handle_info({tcp_closed, S}, State = #state{socket = {_, S}}) ->
-    {stop, {error, {tcp_closed, S}}, State#state{socket = undefined}};
-handle_info({tcp_error, S}, State = #state{socket = {_, S}}) ->
+handle_info({udp_closed, S}, State = #state{device = {_, S}}) ->
+    {stop, {error, {udp_closed, S}}, State#state{device = undefined}};
+handle_info({tcp_closed, S}, State = #state{device = {_, S}}) ->
+    {stop, {error, {tcp_closed, S}}, State#state{device = undefined}};
+handle_info({tcp_error, S}, State = #state{device = {_, S}}) ->
     {stop, {error, {tcp_error, S}}, State};
-handle_info({ssl_closed, S}, State = #state{socket = {_, S}}) ->
-    {stop, {error, {ssl_closed, S}}, State#state{socket = undefined}};
-handle_info({ssl_error, S}, State = #state{socket = {_, S}}) ->
+handle_info({ssl_closed, S}, State = #state{device = {_, S}}) ->
+    {stop, {error, {ssl_closed, S}}, State#state{device = undefined}};
+handle_info({ssl_error, S}, State = #state{device = {_, S}}) ->
     {stop, {error, {ssl_error, S}}, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -240,8 +244,8 @@ handle_info(_Info, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Reason, #state{socket = undefined})        -> ok;
-terminate(_Reason, #state{socket = {Module, Socket}}) -> Module:close(Socket).
+terminate(_Reason, #state{device = {Module, Device}}) -> Module:close(Device);
+terminate(_Reason, #state{})                          -> ok.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -255,29 +259,45 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init_transport(Protocol, State) -> open_socket(get_transport(Protocol), State).
+init_transport(Protocol, State) -> open_device(get_transport(Protocol), State).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-open_socket({udp, Opts}, State) ->
+open_device({udp, Opts}, State) ->
     {ok, Socket} = gen_udp:open(0, Opts),
-    State#state{socket = {gen_udp, Socket}};
-open_socket({tcp, Opts}, State = #state{dest_host = H, dest_port = P}) ->
+    State#state{device = {gen_udp, Socket}};
+open_device({tcp, Opts}, State = #state{dest_host = H, dest_port = P}) ->
     {ok, Socket} = gen_tcp:connect(H, P, Opts, ?TIMEOUT),
-    State#state{socket = {gen_tcp, Socket}};
-open_socket({tls, Opts}, State = #state{dest_host = H, dest_port = P}) ->
+    State#state{device = {gen_tcp, Socket}};
+open_device({tls, Opts}, State = #state{dest_host = H, dest_port = P}) ->
     {ok, Socket} = ssl:connect(H, P, Opts, ?TIMEOUT),
-    State#state{socket = {ssl, Socket}}.
+    State#state{device = {ssl, Socket}};
+open_device({File, Opts}, State) when is_list(File); is_binary(File) ->
+    {ok, IoDevice} = file:open(File, [append | Opts]),
+    State#state{device = {file, IoDevice}};
+open_device({IoDevice, []}, State)
+  when IoDevice =:= standard_io; IoDevice =:= standard_error ->
+    State#state{device = IoDevice}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send(Data, State = #state{socket = {gen_udp, S}, dest_host = H, dest_port = P}) ->
+send(Data, State = #state{device = {gen_udp, S}, dest_host = H, dest_port = P}) ->
     ok = gen_udp:send(S, H, P, Data),
     State;
-send(Data, State = #state{socket = {Module, S}}) ->
-    ok = Module:send(S, [integer_to_list(size(Data)), $\s, Data]),
+send(Data, State = #state{device = {gen_tcp, Socket}}) ->
+    ok = gen_tcp:send(Socket, [integer_to_list(size(Data)), $\s, Data]),
+    State;
+send(Data, State = #state{device = {ssl, Socket}}) ->
+    ok = ssl:send(Socket, [integer_to_list(size(Data)), $\s, Data]),
+    State;
+send(Data, State = #state{device = {file, IoDevice}}) ->
+    ok = file:write(IoDevice, [Data, $\n]),
+    State;
+send(Data, State = #state{device = IoDevice})
+  when IoDevice =:= standard_io; IoDevice =:= standard_error ->
+    ok = io:fwrite(IoDevice, [Data, $\n]),
     State.
 
 %%------------------------------------------------------------------------------
@@ -435,6 +455,8 @@ get_transport({_, tcp, Opts})       -> {tcp, Opts};
 get_transport({_, tcp})             -> {tcp, ?TCP_OPTS};
 get_transport({_, udp, Opts})       -> {udp, Opts};
 get_transport({_, udp})             -> {udp, []};
+get_transport({_, T, Opts})         -> {T, Opts};
+get_transport({_, T})               -> {T, []};
 get_transport(P) when is_atom(P)    -> get_transport({P, ?TRANSPORT}).
 
 %%------------------------------------------------------------------------------

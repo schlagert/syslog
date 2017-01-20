@@ -38,111 +38,113 @@ rfc3164_test_() ->
      5,
      [
       {"RFC 3164 over UDP", fun() -> rfc3164(udp) end},
-      {"RFC 3164 over TCP", fun() -> rfc3164(tcp) end}
+      {"RFC 3164 over TCP", fun() -> rfc3164(tcp) end},
+      {"RFC 3164 to tmp.txt", fun() -> rfc3164("tmp.txt") end}
      ]}.
 
 rfc3164(Transport) ->
-    Sockets = setup(rfc3164, Transport, debug),
+    Devices = setup(rfc3164, Transport, debug),
 
     Proc = pid_to_list(self()),
     Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re1)),
+    ?assertEqual(ok, expect(Devices, Re1, "started application syslog")),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re2)),
+    ?assertEqual(ok, expect(Devices, Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re3)),
+    ?assertEqual(ok, expect(Devices, Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
-    ?assertEqual(ok, expect(Sockets, Re3)),
+    ?assertEqual(ok, expect(Devices, Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
     Re4 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello",
-    ?assertEqual(ok, expect(Sockets, Re4)),
+    ?assertEqual(ok, expect(Devices, Re4)),
     Re5 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - world",
-    ?assertEqual(ok, expect(Sockets, Re5)),
+    ?assertEqual(ok, expect(Devices, Re5)),
 
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
     Re6 = "<131>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re6)),
+    ?assertEqual(ok, expect(Devices, Re6)),
 
-    teardown(Sockets).
+    teardown(Devices).
 
 rfc5424_test_() ->
     {timeout,
      5,
      [
       {"RFC 5424 over UDP", fun() -> rfc5424(udp) end},
-      {"RFC 5424 over TCP", fun() -> rfc5424(tcp) end}
+      {"RFC 5424 over TCP", fun() -> rfc5424(tcp) end},
+      {"RFC 5424 to tmp.txt", fun() -> rfc5424("tmp.txt") end}
      ]}.
 
 rfc5424(Transport) ->
-    Sockets = setup(rfc5424, Transport, debug),
+    Devices = setup(rfc5424, Transport, debug),
 
     Proc = pid_to_list(self()),
     Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re1)),
+    ?assertEqual(ok, expect(Devices, Re1, "started application syslog")),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re2)),
+    ?assertEqual(ok, expect(Devices, Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re3)),
+    ?assertEqual(ok, expect(Devices, Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
-    ?assertEqual(ok, expect(Sockets, Re3)),
+    ?assertEqual(ok, expect(Devices, Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
     Re4 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello",
-    ?assertEqual(ok, expect(Sockets, Re4)),
+    ?assertEqual(ok, expect(Devices, Re4)),
     Re5 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - world",
-    ?assertEqual(ok, expect(Sockets, Re5)),
+    ?assertEqual(ok, expect(Devices, Re5)),
 
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
     Re6 = "<131>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Sockets, Re6)),
+    ?assertEqual(ok, expect(Devices, Re6)),
 
-    teardown(Sockets).
+    teardown(Devices).
 
 log_level_test_() ->
     {timeout,
      5,
      fun() ->
-             Sockets = setup(rfc5424, udp, notice),
+             Devices = setup(rfc5424, udp, notice),
 
              Proc = pid_to_list(self()),
              Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
 
              ?assertEqual(ok, syslog:debug_msg("hello world")),
              ?assertEqual(ok, syslog:info_msg("hello world")),
-             ?assertEqual(timeout, read(Sockets)),
+             ?assertEqual(timeout, read(Devices)),
 
              ?assertEqual(ok, syslog:set_log_level(debug)),
 
              ?assertEqual(ok, syslog:debug_msg("hello world")),
              Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ "
                  ++ Proc ++ " - hello world",
-             ?assertMatch({match, _}, re:run(read(Sockets), Re1)),
+             ?assertMatch({match, _}, re:run(read(Devices), Re1)),
 
-             teardown(Sockets)
+             teardown(Devices)
      end}.
 
 error_logger_test_() ->
     {timeout,
      5,
      fun() ->
-             Sockets = setup(rfc3164, udp, debug, 20),
+             Devices = setup(rfc3164, udp, debug, 20),
 
              %% test message queue limit and drop percentage
 
@@ -153,9 +155,9 @@ error_logger_test_() ->
 
              erlang:resume_process(whereis(error_logger)),
 
-             Receive = fun(_) -> ?assert(is_list(read(Sockets))) end,
+             Receive = fun(_) -> ?assert(is_list(read(Devices))) end,
              ok = lists:foreach(Receive, lists:seq(1, 18)),
-             ?assertEqual(timeout, read(Sockets)),
+             ?assertEqual(timeout, read(Devices)),
 
              %% test (extra) crash_report
 
@@ -165,9 +167,9 @@ error_logger_test_() ->
 
              Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
                  Proc ++ " - exited with {exit,test_reason}",
-             ?assertEqual(ok, wait_for(Sockets, Re)),
+             ?assertEqual(ok, wait_for(Devices, Re)),
 
-             teardown(Sockets)
+             teardown(Devices)
      end}.
 
 %%%=============================================================================
@@ -187,13 +189,19 @@ setup(Protocol, udp, LogLevel, Limit) ->
     ok = setup_apps({Protocol, udp}, LogLevel, Limit),
     {ok, Socket} = gen_udp:open(?TEST_PORT, [list]),
     ok = empty_mailbox(),
-    [Socket];
+    [{gen_udp, Socket}];
 setup(Protocol, tcp, LogLevel, Limit) ->
     {ok, Server} = gen_tcp:listen(?TEST_PORT, [list, {reuseaddr, true}]),
     ok = setup_apps({Protocol, tcp}, LogLevel, Limit),
     {ok, Socket} = gen_tcp:accept(Server),
     ok = empty_mailbox(),
-    [Socket, Server].
+    [{gen_tcp, Socket}, {gen_tcp, Server}];
+setup(Protocol, File, LogLevel, Limit) ->
+    ok = setup_apps({Protocol, File}, LogLevel, Limit),
+    ok = file:write_file(File, <<>>),
+    {ok, IoDevice} = file:open(File, [read]),
+    ok = empty_mailbox(),
+    [{file, IoDevice, File}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -212,7 +220,7 @@ setup_apps(Protocol, LogLevel, Limit) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-teardown(Sockets) ->
+teardown(Devices) ->
     application:stop(syslog),
     application:stop(sasl),
     application:unset_env(syslog, dest_port),
@@ -221,8 +229,13 @@ teardown(Sockets) ->
     application:unset_env(syslog, log_level),
     application:unset_env(syslog, msg_queue_limit),
     application:unset_env(syslog, drop_percentage),
-    [inet:close(Socket) || Socket <- Sockets],
-    ok.
+    lists:foreach(
+      fun({file, IoDevice, File}) ->
+              file:close(IoDevice),
+              file:delete(File);
+         ({_, Socket}) ->
+              inet:close(Socket)
+      end, Devices).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -234,21 +247,34 @@ load(App, {error, {already_loaded, App}}) -> ok.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-wait_for(Sockets, Pattern) ->
-    case expect(Sockets, Pattern) of
-        {nomatch, _, _} -> wait_for(Sockets, Pattern);
+wait_for(Devices, Pattern) ->
+    case expect(Devices, Pattern) of
+        {nomatch, _, _} -> wait_for(Devices, Pattern);
         Other           -> Other
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-expect(Sockets, Pattern) ->
-    case read(Sockets) of
+expect(Devices, Pattern) ->
+    expect(Devices, Pattern, "").
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+expect(Devices, Pattern, Ignore) ->
+    case read(Devices) of
         L when is_list(L) ->
-            case re:run(L, Pattern) of
-                {match, _} -> ok;
-                _          -> {nomatch, L, Pattern}
+            case re:run(L, Pattern, [{capture, none}]) of
+                nomatch when Ignore =:= "" ->
+                    {nomatch, L, Pattern};
+                nomatch ->
+                    case re:run(L, Ignore, [{capture, none}]) of
+                        match   -> expect(Devices, Pattern, "");
+                        nomatch -> {nomatch, L, [Pattern, Ignore]}
+                    end;
+                match ->
+                    ok
             end;
         Other ->
             Other
@@ -257,21 +283,31 @@ expect(Sockets, Pattern) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read(Sockets = [Socket | _]) ->
+read(Devices = [Device | _]) ->
     Acc = proplists:get_value(acc, get(), []),
-    case read_message(Acc) of
-        {ok, {Message, Rest}} ->
+    case {read_message(Acc), Device} of
+        {{ok, {Message, Rest}}, _} ->
             put(acc, Rest),
             Message;
-        error ->
+        {error, {M, Socket}} when M =:= gen_udp; M =:= gen_tcp ->
             receive
                 {udp, Socket, _, _, Message} ->
                     Message;
                 {tcp, Socket, Data} ->
                     put(acc, Acc ++ Data),
-                    read(Sockets)
+                    read(Devices)
             after
                 500 -> timeout
+            end;
+        {error, {file, IoDevice, _}} ->
+            case file:read_line(IoDevice) of
+                {ok, Data} ->
+                    lists:reverse(tl(lists:reverse(Data)));
+                eof ->
+                    ok = timer:sleep(50),
+                    read(Devices);
+                Other ->
+                    Other
             end
     end.
 
