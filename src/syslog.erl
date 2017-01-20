@@ -193,12 +193,13 @@ set_log_mode(Mode) -> syslog_logger:set_log_mode(Mode).
 %% @private
 %%------------------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
-    ok = error_logger:tty(false),
+    DisableTty = syslog_lib:get_property(disable_tty, true),
+    ok = iff(DisableTty, fun() -> error_logger:tty(false) end),
     case supervisor:start_link(?MODULE, []) of
         {ok, Pid} ->
             {ok, Pid};
         Error ->
-	    ok = error_logger:tty(true),
+            ok = iff(DisableTty, fun() -> error_logger:tty(true) end),
             Error
     end.
 
@@ -231,3 +232,9 @@ server(M) -> spec(M, [M]).
 %% @private
 %%------------------------------------------------------------------------------
 spec(M, Ms) -> {M, {M, start_link, []}, transient, brutal_kill, worker, Ms}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+iff(true, Fun)   -> Fun();
+iff(false, _Fun) -> ok.

@@ -173,6 +173,8 @@ This kind of standard logging can be re-enabled at any time using the following:
 ```erlang
 error_logger:tty(true).
 ```
+This behaviour can now be configured in the application environment. If you
+don't want `syslog` to mess with your TTY settings use `{disable_tty, false}`.
 
 The `syslog` application will not touch the standard SASL report handlers
 attached to the `error_logger` when SASL starts. However, having SASL progress
@@ -287,6 +289,7 @@ History
 
 * Allow configuration of custom protocol backend modules (thanks to @rich)
 * Export/move date formatting code into `syslog_lib` (thanks to @rich)
+* Make TTY settings configurable in the application environment
 
 ### 3.0.0
 
