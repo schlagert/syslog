@@ -292,6 +292,10 @@ History
 
 ### Master
 
+* No difference to latest tag
+
+### 3.1.0
+
 * Allow configuration of custom protocol backend modules (thanks to @rich)
 * Export/move date formatting code into `syslog_lib` (thanks to @rich)
 * Make TTY settings configurable in the application environment
