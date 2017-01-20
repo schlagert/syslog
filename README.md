@@ -160,6 +160,11 @@ are available and can be configured in the application environment:
   sacrifice safety for this reason. It's still safer to set this to a lower
   value than completely switching to `{async, true}`. Default is `1000`ms.
 
+* `{syslog_error_logger, boolean()}`
+
+  Specifies whether `syslog` will handle messages from the `error_logger`.
+  Default is `true`.
+
 If your application really needs fast asynchronous logging and you like to live
 dangerously, logging can be done either with the `error_logger` or the `syslog`
 API and the `syslog` application should be configured with `{async, true}` and
@@ -290,6 +295,7 @@ History
 * Allow configuration of custom protocol backend modules (thanks to @rich)
 * Export/move date formatting code into `syslog_lib` (thanks to @rich)
 * Make TTY settings configurable in the application environment
+* Make `error_logger` integration configurable
 
 ### 3.0.0
 

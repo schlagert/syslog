@@ -68,7 +68,10 @@ start_link() -> gen_server:start_link(?MODULE, [], []).
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    ok = lists:foreach(fun add_handler/1, ?REGISTRATIONS),
+    UseErrLogger = syslog_lib:get_property(syslog_error_logger, true),
+    Regs = [R || R = {M, _} <- ?REGISTRATIONS,
+                 M =/= error_logger orelse UseErrLogger],
+    ok = lists:foreach(fun add_handler/1, Regs),
     {ok, #state{}}.
 
 %%------------------------------------------------------------------------------
