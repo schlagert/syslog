@@ -75,18 +75,18 @@ sd(Elements) -> [sd_element(Element) || Element <- Elements].
 %% @private
 %%------------------------------------------------------------------------------
 sd_element({Id, Params}) ->
-    [$[, to_binary(Id), [sd_param(Param) || Param <- Params], $]].
+    [$[, to_iolist(Id), [sd_param(Param) || Param <- Params], $]].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-sd_param({Name, Value}) -> [$\s, to_binary(Name), $=, $", to_binary(Value), $"].
+sd_param({Name, Value}) -> [$\s, to_iolist(Name), $=, $", to_iolist(Value), $"].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-to_binary(A) when is_atom(A)    -> atom_to_binary(A, utf8);
-to_binary(B) when is_binary(B)  -> B;
-to_binary(F) when is_float(F)   -> float_to_binary(F, [compact, {decimals, 5}]);
-to_binary(I) when is_integer(I) -> integer_to_binary(I);
-to_binary(L) when is_list(L)    -> iolist_to_binary(L).
+to_iolist(A) when is_atom(A)    -> atom_to_binary(A, utf8);
+to_iolist(B) when is_binary(B)  -> B;
+to_iolist(F) when is_float(F)   -> io_lib:format("~w", [F]);
+to_iolist(I) when is_integer(I) -> integer_to_list(I);
+to_iolist(L) when is_list(L)    -> iolist_to_binary(L).
