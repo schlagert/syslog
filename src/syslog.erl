@@ -40,6 +40,7 @@
          msg/2,
          msg/3,
          msg/4,
+         msg/5,
          set_log_level/1,
          set_log_mode/1]).
 
@@ -61,10 +62,19 @@
 
 -type datetime() :: {calendar:datetime(), non_neg_integer()}.
 
+-type sd_id() :: atom() | binary() | iolist().
+-type param_name() :: atom() | binary() | iolist().
+-type param_value() :: atom() | binary() | iolist() | integer() | float().
+-type sd_param() :: {param_name(), param_value()}.
+-type sd_element() :: {sd_id(), [sd_param()]}.
+
 -export_type([facility/0,
               severity/0,
               proc_name/0,
-              datetime/0]).
+              datetime/0,
+              sd_id/0,
+              sd_param/0,
+              sd_element/0]).
 
 -include("syslog.hrl").
 
@@ -166,7 +176,19 @@ msg(Severity, Fmt, Args) -> msg(Severity, self(), Fmt, Args).
 %%------------------------------------------------------------------------------
 -spec msg(severity(), proc_name(), io:format(), [term()]) -> ok.
 msg(Severity, Pid, Fmt, Args) ->
-    syslog_logger:maybe_log(Severity, Pid, os:timestamp(), Fmt, Args).
+    msg(Severity, Pid, [], Fmt, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Logs a format message with a specific severity from a specific process with
+%% the specified STRUCTURED-DATA (if this is supported by the formatting
+%% backend). Note that STRUCTURED-DATA is not checked for validity.
+%% This function never fails.
+%% @end
+%%------------------------------------------------------------------------------
+-spec msg(severity(), proc_name(), [sd_element()], io:format(), [term()]) -> ok.
+msg(Severity, Pid, SD, Fmt, Args) ->
+    syslog_logger:maybe_log(Severity, Pid, os:timestamp(), SD, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

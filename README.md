@@ -32,6 +32,7 @@ Features
 * Log messages and standard `error_logger` reports formatted according to
   RFC 3164 (BSD Syslog) or RFC 5424 (Syslog Protocol) without the need for
   drivers, ports or NIFs.
+* Support for sending RFC 5424 _STRUCTURED-DATA_.
 * System independent logging to local or remote facilities using one of the
   following transports:
   * UDP (RFC 3164 and RFC 5426)
@@ -198,6 +199,12 @@ The `syslog` application will log everything that is logged using the standard
 `error_logger` API. However, __this should not be used for ordinary application
 logging__.
 
+To facilitate logging of _STRUCTURED-DATA_ the `syslog:msg/5` functions must be
+used. This function allows passing a list of structured data elements that will
+be formatted and sent to the remote receiver. However, no content checking will
+be done. If there's unescaped or unallowed content in the provided structured
+data elements invalid Syslog messages will be sent.
+
 The proper way to add logging to your application is to use the API functions
 provided by the `syslog` module. These functions are similar to the ones
 provided by the `error_logger` module and should feel familiar (see the
@@ -290,9 +297,11 @@ TODO more details?
 History
 -------
 
-### Master
+### Master (3.2.0)
 
-* No difference to latest tag
+* Add support for _STRUCTURED-DATA_ (RFC 5424) using `syslog:msg/5`. This lead
+  to __a change of the internal formatter behaviour__. Custom implementations
+  of the `syslog_logger` behaviour must be adapted to these changes.
 
 ### 3.1.0
 

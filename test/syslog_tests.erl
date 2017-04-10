@@ -48,6 +48,13 @@ rfc3164(Transport) ->
     Proc = pid_to_list(self()),
     Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
 
+    StructuredData = [
+                      {'myid@1234', [{a, 1}, {b, 2.5}]},
+                      {<<"myid@2345">>, [{c, "1"}, {d, <<"2">>}]}
+                     ],
+
+    ?assertEqual(ok, syslog:msg(notice, self(), StructuredData, "", [])),
+
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
     ?assertEqual(ok, expect(Devices, Re1, "started application syslog")),
@@ -90,6 +97,11 @@ rfc5424(Transport) ->
     Proc = pid_to_list(self()),
     Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
 
+    StructuredData = [
+                      {'myid@1234', [{a, 1}, {b, 2.5}]},
+                      {<<"myid@2345">>, [{c, "1"}, {d, <<"2">>}]}
+                     ],
+
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
     ?assertEqual(ok, expect(Devices, Re1, "started application syslog")),
@@ -114,6 +126,16 @@ rfc5424(Transport) ->
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
     Re6 = "<131>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
     ?assertEqual(ok, expect(Devices, Re6)),
+
+    ?assertEqual(ok, syslog:msg(notice, self(), StructuredData, "", [])),
+    Re7 = "<29>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " "
+        "\\[myid@1234 a=\"1\" b=\"2.5\"\\]"
+        "\\[myid@2345 c=\"1\" d=\"2\"\\]",
+    ?assertEqual(ok, expect(Devices, Re7)),
+
+    ?assertEqual(ok, syslog:msg(notice, self(), StructuredData, "info", [])),
+    Re8 = Re7 ++ " info",
+    ?assertEqual(ok, expect(Devices, Re8)),
 
     teardown(Devices).
 

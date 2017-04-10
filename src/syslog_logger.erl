@@ -38,7 +38,7 @@
 %% API
 -export([start_link/0,
          maybe_log/4,
-         maybe_log/5,
+         maybe_log/6,
          set_log_level/1,
          set_log_mode/1]).
 
@@ -79,13 +79,13 @@
 
 -callback hdr(syslog:datetime(), binary(), #syslog_cfg{}) -> iodata().
 %% @doc
-%% Format a header this should include everything including structured data but
-%% excluding the PRI part.
+%% Format a header this should not include the PRI part of the header.
 %% @end
 
--callback msg(binary(), #syslog_cfg{}) -> binary().
+-callback msg([syslog:sd_element()], binary(), #syslog_cfg{}) -> binary().
 %% @doc
-%% Format the message part (if necessary).
+%% Format the message part which consists of structured data and the actual
+%% free-form message (if necessary).
 %% @end
 
 %%%=============================================================================
@@ -119,7 +119,7 @@ maybe_log(Severity, Pid, Timestamp, Msg) ->
     Opts = #opts{log_level = Level} = get_opts(),
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
-            log(SeverityInt, Pid, Timestamp, Msg, Opts);
+            log(SeverityInt, Pid, Timestamp, [], Msg, Opts);
         _ ->
             ok
     end.
@@ -132,15 +132,15 @@ maybe_log(Severity, Pid, Timestamp, Msg) ->
 -spec maybe_log(syslog:severity(),
                 syslog:proc_name(),
                 erlang:timestamp(),
+                [syslog:sd_element()],
                 io:format(),
                 [term()]) -> ok.
-maybe_log(Severity, Pid, Timestamp, Fmt, Args) ->
+maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
     Opts = #opts{log_level = Level} = get_opts(),
     case map_severity(Severity) of
         SeverityInt when SeverityInt =< Level ->
-            try
-                Msg = io_lib:format(Fmt, Args),
-                log(SeverityInt, Pid, Timestamp, Msg, Opts)
+            try io_lib:format(Fmt, Args) of
+                Msg -> log(SeverityInt, Pid, Timestamp, SD, Msg, Opts)
             catch
                 C:E -> ?ERR("io_lib:format(~p,~p) failed (~p:~p)~n",
                             [Fmt, Args, C, E])
@@ -303,15 +303,17 @@ send(Data, State = #state{device = IoDevice})
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log(Severity, Pid, Timestamp, Msg, Opts) ->
+log(Severity, Pid, Timestamp, StructuredData, Msg, Opts) ->
     PRI = pri(Severity, Opts),
     HDR = hdr(Pid, Timestamp, Opts),
     lists:foreach(
-      fun(<<>>) ->
+      fun(<<>>) when StructuredData =:= [] ->
               ok;
          (Message) ->
-              MSG = msg(Message, Opts),
-              forward(Msg, iolist_to_binary([PRI, HDR, MSG]), Opts)
+              case msg(StructuredData, Message, Opts) of
+                  <<>> -> ok;
+                  MSG  -> forward(Msg, iolist_to_binary([PRI, HDR, MSG]), Opts)
+              end
       end, binary:split(iolist_to_binary(Msg), [<<"\n">>, <<"\r">>], [global])).
 
 %%------------------------------------------------------------------------------
@@ -334,7 +336,8 @@ hdr(Pid, Timestamp, #opts{protocol = Protocol, cfg = Cfg}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-msg(Msg, #opts{protocol = Protocol, cfg = Cfg}) -> Protocol:msg(Msg, Cfg).
+msg(StructuredData, Msg, #opts{protocol = Protocol, cfg = Cfg}) ->
+    Protocol:msg(StructuredData, Msg, Cfg).
 
 %%------------------------------------------------------------------------------
 %% @private

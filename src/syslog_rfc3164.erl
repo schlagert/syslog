@@ -22,7 +22,7 @@
 -behaviour(syslog_logger).
 
 %% API
--export([hdr/3, msg/2]).
+-export([hdr/3, msg/3]).
 
 -include("syslog.hrl").
 
@@ -49,8 +49,8 @@ hdr(Datetime, Pid, Cfg = #syslog_cfg{appname = A, beam_pid = B}) ->
 %% Format the MSG part of RFC 3164. Basically a noop.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(binary(), #syslog_cfg{}) -> binary().
-msg(Msg, _Cfg) -> Msg.
+-spec msg([syslog:sd_element()], binary(), #syslog_cfg{}) -> binary().
+msg(_StructuredData, Msg, _Cfg) -> Msg.
 
 %%%=============================================================================
 %%% internal functions
@@ -91,6 +91,6 @@ hdr_test() ->
     Actual = iolist_to_binary(hdr(Datetime, Pid, Cfg)),
     ?assertMatch({match, _}, re:run(Actual, Rx)).
 
-msg_test() -> ?assertEqual(<<"info">>, msg(<<"info">>, #syslog_cfg{})).
+msg_test() -> ?assertEqual(<<"info">>, msg([], <<"info">>, #syslog_cfg{})).
 
 -endif.

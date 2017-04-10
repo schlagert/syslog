@@ -23,7 +23,7 @@
 -behaviour(syslog_logger).
 
 %% API
--export([hdr/3, msg/2]).
+-export([hdr/3, msg/3]).
 
 -include("syslog.hrl").
 
@@ -47,7 +47,7 @@ hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
      syslog_lib:truncate(255, H), $\s,
      syslog_lib:truncate(48, A), $\s,
      syslog_lib:truncate(128, B), $\s,
-     syslog_lib:truncate(32, Pid), $\s, $-, $\s
+     syslog_lib:truncate(32, Pid), $\s
     ].
 
 %%------------------------------------------------------------------------------
@@ -55,5 +55,38 @@ hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
 %% Format the MSG part of RFC 5424.
 %% @end
 %%------------------------------------------------------------------------------
--spec msg(binary(), #syslog_cfg{}) -> binary().
-msg(Msg, #syslog_cfg{bom = Bom}) -> unicode:characters_to_binary([Bom, Msg]).
+-spec msg([syslog:sd_element()], binary(), #syslog_cfg{}) -> binary().
+msg(StructuredData, <<>>, _SyslogCfg) when StructuredData =/= [] ->
+    unicode:characters_to_binary(sd(StructuredData));
+msg(StructuredData, Msg, #syslog_cfg{bom = Bom}) ->
+    unicode:characters_to_binary([sd(StructuredData), $\s, Bom, Msg]).
+
+%%%=============================================================================
+%%% internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+sd([])       -> $-;
+sd(Elements) -> [sd_element(Element) || Element <- Elements].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+sd_element({Id, Params}) ->
+    [$[, to_binary(Id), [sd_param(Param) || Param <- Params], $]].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+sd_param({Name, Value}) -> [$\s, to_binary(Name), $=, $", to_binary(Value), $"].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_binary(A) when is_atom(A)    -> atom_to_binary(A, utf8);
+to_binary(B) when is_binary(B)  -> B;
+to_binary(F) when is_float(F)   -> float_to_binary(F, [compact, {decimals, 5}]);
+to_binary(I) when is_integer(I) -> integer_to_binary(I);
+to_binary(L) when is_list(L)    -> iolist_to_binary(L).
