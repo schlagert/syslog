@@ -196,7 +196,7 @@ set_log_function(Function) ->
                   {module(), inet:socket() | io:device()}.
 
 -record(state, {
-          device    :: device(),
+          device    :: device() | undefined,
           dest_host :: inet:ip_address() | inet:hostname(),
           dest_port :: inet:port_number()}).
 
