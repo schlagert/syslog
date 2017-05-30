@@ -204,6 +204,8 @@ set_log_function(Function) ->
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
+    %% avoid excessive garbage collection
+    catch process_flag(message_queue_data, off_heap),
     State = #state{
                dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST),
                dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT)},
