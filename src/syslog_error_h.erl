@@ -214,12 +214,13 @@ log_crash(false, Pid, Report, State) ->
 log_crash(true, Pid, Report = [SubReport | _], State) ->
     NewState = log_crash(false, Pid, Report, State),
     try proplists:get_value(error_info, SubReport) of
-        {Class, {Reason, [{M, F, A, []} | _]}, _} ->
-            log_msg(error, Pid, "exited with ~w at ~s:~s/~w",
-                    [{Class, Reason}, M, F, A], NewState);
-        {Class, {Reason, [{M, Fu, A, [{file, Fi}, {line, L} | _]} | _]}, _} ->
-            log_msg(error, Pid, "exited with ~w at ~s:~s/~w (~s:~w)",
-                    [{Class, Reason}, M, Fu, A, Fi, L], NewState);
+        {Class, {Reason, [{M, F, Args, Ps} | _]}, _} when is_list(Args) ->
+            As = string:join([io_lib:format("~w", [A]) || A <- Args], ","),
+            log_msg(error, Pid, "exited with ~w at ~s:~s(~s)~s",
+                    [{Class, Reason}, M, F, As, get_line(Ps)], NewState);
+        {Class, {Reason, [{M, F, Arity, Ps} | _]}, _} when is_integer(Arity) ->
+            log_msg(error, Pid, "exited with ~w at ~s:~s/~w~s",
+                    [{Class, Reason}, M, F, Arity, get_line(Ps)], NewState);
         {Class, {Reason, []}, _} ->
             log_msg(error, Pid, "exited with ~w", [{Class, Reason}], NewState);
         {Class, Reason, _} ->
@@ -230,4 +231,13 @@ log_crash(true, Pid, Report = [SubReport | _], State) ->
         _:_ ->
             ?ERR("~w exited with ~w~n", [Pid, SubReport]),
             NewState
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_line(Proplist) ->
+    case proplists:get_value(line, Proplist) of
+        L when is_integer(L) -> [" line ", integer_to_list(L)];
+        undefined            -> ""
     end.
