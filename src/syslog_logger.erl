@@ -142,8 +142,8 @@ maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
             try io_lib:format(Fmt, Args) of
                 Msg -> log(SeverityInt, Pid, Timestamp, SD, Msg, Opts)
             catch
-                C:E -> ?ERR("io_lib:format(~p,~p) failed (~p:~p)~n",
-                            [Fmt, Args, C, E])
+                C:E -> ?ERR("~s - io_lib:format(~p,~p) failed (~p:~p)~n",
+                            [?MODULE, Fmt, Args, C, E])
             end;
         _ ->
             ok
@@ -246,8 +246,7 @@ handle_info(_Info, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Reason, #state{device = {Module, Device}}) -> Module:close(Device);
-terminate(_Reason, #state{})                          -> ok.
+terminate(_Reason, State) -> close_transport(State).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -262,6 +261,22 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %% @private
 %%------------------------------------------------------------------------------
 init_transport(Protocol, State) -> open_device(get_transport(Protocol), State).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+close_transport(#state{device = {Module, Device}}) -> Module:close(Device);
+close_transport(#state{})                          -> ok.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+ensure_transport(ok, State) ->
+    State;
+ensure_transport(Error, State) ->
+    ?ERR("~s - Message transport failed with ~w~n", [?MODULE, Error]),
+    close_transport(State),
+    init_transport(syslog_lib:get_property(protocol, ?PROTOCOL), State).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -286,21 +301,18 @@ open_device({IoDevice, []}, State)
 %% @private
 %%------------------------------------------------------------------------------
 send(Data, State = #state{device = {gen_udp, S}, dest_host = H, dest_port = P}) ->
-    ok = gen_udp:send(S, H, P, Data),
-    State;
+    ensure_transport(gen_udp:send(S, H, P, Data), State);
 send(Data, State = #state{device = {gen_tcp, Socket}}) ->
-    ok = gen_tcp:send(Socket, [integer_to_list(size(Data)), $\s, Data]),
-    State;
+    Frame = [integer_to_list(size(Data)), $\s, Data],
+    ensure_transport(gen_tcp:send(Socket, Frame), State);
 send(Data, State = #state{device = {ssl, Socket}}) ->
-    ok = ssl:send(Socket, [integer_to_list(size(Data)), $\s, Data]),
-    State;
+    Frame = [integer_to_list(size(Data)), $\s, Data],
+    ensure_transport(ssl:send(Socket, Frame), State);
 send(Data, State = #state{device = {file, IoDevice}}) ->
-    ok = file:write(IoDevice, [Data, $\n]),
-    State;
+    ensure_transport(file:write(IoDevice, [Data, $\n]), State);
 send(Data, State = #state{device = IoDevice})
   when IoDevice =:= standard_io; IoDevice =:= standard_error ->
-    ok = io:fwrite(IoDevice, [Data, $\n]),
-    State.
+    ensure_transport(io:fwrite(IoDevice, [Data, $\n]), State).
 
 %%------------------------------------------------------------------------------
 %% @private

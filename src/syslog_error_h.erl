@@ -123,7 +123,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 drop_msg(Msg, State = #state{msgs_to_drop = 0, dropped = Dropped}) ->
     {E, W, I} = drop_msg_(Msg, Dropped),
-    ?ERR("~s DROPPED ~p errors, ~p warnings, ~p notices~n", [?MODULE, E, W, I]),
+    ?ERR("~s - DROPPED ~p errors, ~p warnings, ~p notices~n", [?MODULE, E, W, I]),
     State#state{dropped = {0, 0, 0}};
 drop_msg(Msg, State = #state{dropped = Dropped}) ->
     State#state{dropped = drop_msg_(Msg, Dropped)}.
