@@ -80,16 +80,18 @@ init([Level]) -> {ok, #state{log_level = level_to_mask(Level)}}.
 handle_event({log, Level, _, [_, Location, Message]}, State)
   when Level =< State#state.log_level ->
     Severity = get_severity(Level),
+    Pid = get_pid(Location),
     Timestamp = os:timestamp(),
-    syslog_logger:maybe_log(Severity, get_pid(Location), Timestamp, Message),
+    syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format),
     {ok, State};
 handle_event({log, Msg}, State = #state{log_level = Level}) ->
     case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
         true ->
             Severity = get_severity(Msg),
+            Pid = get_pid(Msg),
             Timestamp = apply(lager_msg, timestamp, [Msg]),
             Message = apply(lager_default_formatter, format, [Msg, ?CFG]),
-            syslog_logger:maybe_log(Severity, get_pid(Msg), Timestamp, Message);
+            syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format);
         false ->
             ok
     end,

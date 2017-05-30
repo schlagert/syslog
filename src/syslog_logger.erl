@@ -37,8 +37,8 @@
 
 %% API
 -export([start_link/0,
-         maybe_log/4,
-         maybe_log/6,
+         log/6,
+         async_log/6,
          set_log_level/1,
          set_log_mode/1]).
 
@@ -105,49 +105,32 @@ start_link() ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Forwards a pre-formatted message.
-%%
-%% This is mainly used internally (e.g. by `syslog_error_h' or
-%% `syslog_lager_backend'). This function never fails.
+%% Forwards a message. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec maybe_log(syslog:severity(),
-                syslog:proc_name(),
-                erlang:timestamp(),
-                iodata()) -> ok.
-maybe_log(Severity, Pid, Timestamp, Msg) ->
-    Opts = #opts{log_level = Level} = get_opts(),
-    case map_severity(Severity) of
-        SeverityInt when SeverityInt =< Level ->
-            log(SeverityInt, Pid, Timestamp, [], Msg, Opts);
-        _ ->
-            ok
-    end.
+-spec log(syslog:severity(),
+          syslog:proc_name(),
+          erlang:timestamp(),
+          [syslog:sd_element()],
+          io:format() | iolist(),
+          [term()] | no_format) -> ok.
+log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
+    maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, get_opts()).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Forwards a format message. This function never fails.
+%% Forwards a message asynchronously. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
--spec maybe_log(syslog:severity(),
+-spec async_log(syslog:severity(),
                 syslog:proc_name(),
                 erlang:timestamp(),
                 [syslog:sd_element()],
-                io:format(),
-                [term()]) -> ok.
-maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
-    Opts = #opts{log_level = Level} = get_opts(),
-    case map_severity(Severity) of
-        SeverityInt when SeverityInt =< Level ->
-            try io_lib:format(Fmt, Args) of
-                Msg -> log(SeverityInt, Pid, Timestamp, SD, Msg, Opts)
-            catch
-                C:E -> ?ERR("~s - io_lib:format(~p,~p) failed (~p:~p)~n",
-                            [?MODULE, Fmt, Args, C, E])
-            end;
-        _ ->
-            ok
-    end.
+                io:format() | iolist(),
+                [term()] | no_format) -> ok.
+async_log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
+    AsyncOpts = (get_opts())#opts{function = get_function(true)},
+    maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, AsyncOpts).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -276,6 +259,7 @@ ensure_transport(ok, State) ->
 ensure_transport(Error, State) ->
     ?ERR("~s - Message transport failed with ~w~n", [?MODULE, Error]),
     close_transport(State),
+    ?ERR("~s - DROPPED ~w messages~n", [?MODULE, flush_msg_queue()]),
     init_transport(syslog_lib:get_property(protocol, ?PROTOCOL), State).
 
 %%------------------------------------------------------------------------------
@@ -317,7 +301,25 @@ send(Data, State = #state{device = IoDevice})
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log(Severity, Pid, Timestamp, StructuredData, Msg, Opts) ->
+maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, Opts) ->
+    case {map_severity(Severity), Args} of
+        {SeverityInt, _Args} when SeverityInt > Opts#opts.log_level ->
+            ok;
+        {SeverityInt, no_format} ->
+            do_log(SeverityInt, Pid, Timestamp, SD, Fmt, Opts);
+        {SeverityInt, Args} ->
+            try io_lib:format(Fmt, Args) of
+                Msg -> do_log(SeverityInt, Pid, Timestamp, SD, Msg, Opts)
+            catch
+                C:E -> ?ERR("~s - io_lib:format(~p,~p) failed (~p:~p)~n",
+                            [?MODULE, Fmt, Args, C, E])
+            end
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+do_log(Severity, Pid, Timestamp, StructuredData, Msg, Opts) ->
     PRI = pri(Severity, Opts),
     HDR = hdr(Pid, Timestamp, Opts),
     lists:foreach(
@@ -409,6 +411,14 @@ get_opts() ->
 set_opts(LogLevel, Protocol, State) ->
     true = ets:insert(?MODULE, new_opts(LogLevel, Protocol)),
     State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+flush_msg_queue() ->
+    flush_msg_queue(0).
+flush_msg_queue(N) ->
+    receive {log, _} -> flush_msg_queue(N + 1) after 0 -> N end.
 
 %%------------------------------------------------------------------------------
 %% @private

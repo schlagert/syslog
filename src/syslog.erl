@@ -188,7 +188,7 @@ msg(Severity, Pid, Fmt, Args) ->
 %%------------------------------------------------------------------------------
 -spec msg(severity(), proc_name(), [sd_element()], io:format(), [term()]) -> ok.
 msg(Severity, Pid, SD, Fmt, Args) ->
-    syslog_logger:maybe_log(Severity, Pid, os:timestamp(), SD, Fmt, Args).
+    syslog_logger:log(Severity, Pid, os:timestamp(), SD, Fmt, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

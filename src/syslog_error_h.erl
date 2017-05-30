@@ -123,7 +123,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 drop_msg(Msg, State = #state{msgs_to_drop = 0, dropped = Dropped}) ->
     {E, W, I} = drop_msg_(Msg, Dropped),
-    ?ERR("~s - DROPPED ~p errors, ~p warnings, ~p notices~n", [?MODULE, E, W, I]),
+    ?ERR("~s - DROPPED ~w errors, ~w warnings, ~w notices~n", [?MODULE, E, W, I]),
     State#state{dropped = {0, 0, 0}};
 drop_msg(Msg, State = #state{dropped = Dropped}) ->
     State#state{dropped = drop_msg_(Msg, Dropped)}.
@@ -163,7 +163,7 @@ handle_msg(_, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 log_msg(Severity, Pid, Fmt, Args, State) ->
-    syslog:msg(Severity, Pid, Fmt, Args),
+    syslog_logger:async_log(Severity, Pid, os:timestamp(), [], Fmt, Args),
     State.
 
 %%------------------------------------------------------------------------------
@@ -194,7 +194,7 @@ log_report(_, Pid, supervisor_report, Report, State) ->
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
     Msg = sasl_report:format_report(fd, all, Event),
-    syslog_logger:maybe_log(crash, Pid, Timestamp, Msg),
+    syslog_logger:async_log(crash, Pid, Timestamp, [], Msg, no_format),
     State;
 log_report(Severity, Pid, _, Report, State = #state{verbose = true}) ->
     log_msg(Severity, Pid, "~p", [Report], State);
@@ -209,7 +209,7 @@ log_crash(false, Pid, Report, State) ->
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
     Msg = sasl_report:format_report(fd, all, Event),
-    syslog_logger:maybe_log(crash, Pid, Timestamp, Msg),
+    syslog_logger:async_log(crash, Pid, Timestamp, [], Msg, no_format),
     State;
 log_crash(true, Pid, Report = [SubReport | _], State) ->
     NewState = log_crash(false, Pid, Report, State),
