@@ -297,11 +297,20 @@ TODO more details?
 History
 -------
 
-### Master (3.2.0)
+### Master (3.3.0)
+
+No changes to latest tag
+
+### 3.2.0
 
 * Add support for _STRUCTURED-DATA_ (RFC 5424) using `syslog:msg/5`. This lead
   to __a change of the internal formatter behaviour__. Custom implementations
   of the `syslog_logger` behaviour must be adapted to these changes.
+* Error logger robustness has been improved, by giving the `error_logger`
+  messages precedence over messages sent via the API.
+* The internal `syslog_logger` handles transport errors (gracefully). This way
+  crashes are avoided which in turn relieve the `error_logger` when the system
+  is under high load already.
 
 ### 3.1.0
 
