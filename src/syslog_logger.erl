@@ -179,9 +179,11 @@ set_log_function(Function) ->
                   {module(), inet:socket() | io:device()}.
 
 -record(state, {
-          device    :: device() | undefined,
-          dest_host :: inet:ip_address() | inet:hostname(),
-          dest_port :: inet:port_number()}).
+          device             :: device() | undefined,
+          timer = make_ref() :: reference(),
+          protocol           :: atom() | tuple(),
+          dest_host          :: inet:ip_address() | inet:hostname(),
+          dest_port          :: inet:port_number()}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -190,19 +192,17 @@ init([]) ->
     %% avoid excessive garbage collection
     catch process_flag(message_queue_data, off_heap),
     State = #state{
+               protocol = syslog_lib:get_property(protocol, ?PROTOCOL),
                dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST),
                dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT)},
     LogLevel = syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL),
-    Protocol = syslog_lib:get_property(protocol, ?PROTOCOL),
-    {ok, set_opts(LogLevel, Protocol, init_transport(Protocol, State))}.
+    {ok, set_opts(LogLevel, init_transport(State))}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_call({log, Msg}, _From, State) ->
-    {reply, ok, send(Msg, State)};
-handle_call(_Request, _From, State) ->
-    {reply, undef, State}.
+handle_call({log, Msg}, _From, State) -> {reply, ok, send(Msg, State)};
+handle_call(_Request, _From, State)   -> {reply, undef, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -213,16 +213,23 @@ handle_cast(_Request, State)   -> {noreply, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+handle_info({timeout, Ref, open_device}, State = #state{timer = Ref}) ->
+    {noreply, init_transport(State)};
 handle_info({udp_closed, S}, State = #state{device = {_, S}}) ->
-    {stop, {error, {udp_closed, S}}, State#state{device = undefined}};
+    Error = {error, {udp_closed, S}},
+    {noreply, ensure_transport(0, Error, State#state{device = undefined})};
 handle_info({tcp_closed, S}, State = #state{device = {_, S}}) ->
-    {stop, {error, {tcp_closed, S}}, State#state{device = undefined}};
+    Error = {error, {tcp_closed, S}},
+    {noreply, ensure_transport(0, Error, State#state{device = undefined})};
 handle_info({tcp_error, S}, State = #state{device = {_, S}}) ->
-    {stop, {error, {tcp_error, S}}, State};
+    Error = {error, {tcp_error, S}},
+    {noreply, ensure_transport(0, Error, State)};
 handle_info({ssl_closed, S}, State = #state{device = {_, S}}) ->
-    {stop, {error, {ssl_closed, S}}, State#state{device = undefined}};
+    Error = {error, {ssl_closed, S}},
+    {noreply, ensure_transport(0, Error, State#state{device = undefined})};
 handle_info({ssl_error, S}, State = #state{device = {_, S}}) ->
-    {stop, {error, {ssl_error, S}}, State};
+    Error = {error, {ssl_error, S}},
+    {noreply, ensure_transport(0, Error, State)};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -243,7 +250,8 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init_transport(Protocol, State) -> open_device(get_transport(Protocol), State).
+init_transport(State = #state{protocol = Protocol}) ->
+    open_device(get_transport(Protocol), State).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -254,29 +262,25 @@ close_transport(#state{})                          -> ok.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-ensure_transport(ok, State) ->
+ensure_transport(_N, ok, State) ->
     State;
-ensure_transport(Error, State) ->
+ensure_transport(N, Error, State) ->
     ?ERR("~s - Message transport failed with ~w~n", [?MODULE, Error]),
     close_transport(State),
-    ?ERR("~s - DROPPED ~w messages~n", [?MODULE, flush_msg_queue()]),
-    init_transport(syslog_lib:get_property(protocol, ?PROTOCOL), State).
+    ?ERR("~s - DROPPED ~w messages~n", [?MODULE, flush_msg_queue(N)]),
+    init_transport(State#state{device = undefined}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 open_device({udp, Opts}, State) ->
-    {ok, Socket} = gen_udp:open(0, Opts),
-    State#state{device = {gen_udp, Socket}};
+    open_device_impl(gen_udp, open, [0, Opts], State);
 open_device({tcp, Opts}, State = #state{dest_host = H, dest_port = P}) ->
-    {ok, Socket} = gen_tcp:connect(H, P, Opts, ?TIMEOUT),
-    State#state{device = {gen_tcp, Socket}};
+    open_device_impl(gen_tcp, connect, [H, P, Opts, ?TIMEOUT], State);
 open_device({tls, Opts}, State = #state{dest_host = H, dest_port = P}) ->
-    {ok, Socket} = ssl:connect(H, P, Opts, ?TIMEOUT),
-    State#state{device = {ssl, Socket}};
+    open_device_impl(ssl, connect, [H, P, Opts, ?TIMEOUT], State);
 open_device({File, Opts}, State) when is_list(File); is_binary(File) ->
-    {ok, IoDevice} = file:open(File, [append | Opts]),
-    State#state{device = {file, IoDevice}};
+    open_device_impl(file, open, [File, [append | Opts]], State);
 open_device({IoDevice, []}, State)
   when IoDevice =:= standard_io; IoDevice =:= standard_error ->
     State#state{device = IoDevice}.
@@ -284,19 +288,34 @@ open_device({IoDevice, []}, State)
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+open_device_impl(Module, Fun, Args, State) ->
+    case erlang:apply(Module, Fun, Args) of
+        {ok, Device} ->
+            State#state{device = {Module, Device}};
+        Error ->
+            ?ERR("~s - Failed to open transport ~w~n", [?MODULE, Error]),
+            Time = syslog_lib:get_property(retry_timeout, ?TIMEOUT),
+            State#state{timer = erlang:start_timer(Time, self(), open_device)}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+send(_Data, State = #state{device = undefined}) ->
+    State;
 send(Data, State = #state{device = {gen_udp, S}, dest_host = H, dest_port = P}) ->
-    ensure_transport(gen_udp:send(S, H, P, Data), State);
+    ensure_transport(1, gen_udp:send(S, H, P, Data), State);
 send(Data, State = #state{device = {gen_tcp, Socket}}) ->
     Frame = [integer_to_list(size(Data)), $\s, Data],
-    ensure_transport(gen_tcp:send(Socket, Frame), State);
+    ensure_transport(1, gen_tcp:send(Socket, Frame), State);
 send(Data, State = #state{device = {ssl, Socket}}) ->
     Frame = [integer_to_list(size(Data)), $\s, Data],
-    ensure_transport(ssl:send(Socket, Frame), State);
+    ensure_transport(1, ssl:send(Socket, Frame), State);
 send(Data, State = #state{device = {file, IoDevice}}) ->
-    ensure_transport(file:write(IoDevice, [Data, $\n]), State);
+    ensure_transport(1, file:write(IoDevice, [Data, $\n]), State);
 send(Data, State = #state{device = IoDevice})
   when IoDevice =:= standard_io; IoDevice =:= standard_error ->
-    ensure_transport(io:fwrite(IoDevice, [Data, $\n]), State).
+    ensure_transport(1, io:fwrite(IoDevice, [Data, $\n]), State).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -408,15 +427,13 @@ get_opts() ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-set_opts(LogLevel, Protocol, State) ->
+set_opts(LogLevel, State = #state{protocol = Protocol}) ->
     true = ets:insert(?MODULE, new_opts(LogLevel, Protocol)),
     State.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-flush_msg_queue() ->
-    flush_msg_queue(0).
 flush_msg_queue(N) ->
     receive {log, _} -> flush_msg_queue(N + 1) after 0 -> N end.
 

@@ -297,9 +297,9 @@ TODO more details?
 History
 -------
 
-### Master (3.3.0)
+### Master (3.2.1)
 
-No changes to latest tag
+* Try to reopen the transport periodically on transport failures/errors (#11).
 
 ### 3.2.0
 

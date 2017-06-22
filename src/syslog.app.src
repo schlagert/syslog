@@ -16,7 +16,7 @@
 {application, syslog,
  [
   {description, "A Syslog-based logging framework."},
-  {vsn, "3.3.0"},
+  {vsn, "3.2.1"},
   {registered,
    [
     syslog_logger
