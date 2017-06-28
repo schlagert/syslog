@@ -66,13 +66,36 @@ set_log_level(Level) ->
 %%% gen_event callbacks
 %%%=============================================================================
 
--record(state, {log_level :: integer() | {mask, integer()}}).
+-record(state, {
+    log_level :: integer() | {mask, integer()},
+    formatter :: atom(),
+    format_config :: list(),
+    structured_data_id :: string() | undefined,
+    lager_metadata_keys :: [atom()]
+}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([])      -> init([syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)]);
-init([Level]) -> {ok, #state{log_level = level_to_mask(Level)}}.
+init([]) ->
+    init([syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL),
+        {},
+        {lager_default_formatter, ?CFG}
+    ]);
+init([Level]) ->
+    init([Level, {}, {lager_default_formatter, ?CFG}]);
+init([Level, {}, {Formatter, FormatterConfig}])
+  when is_atom(Formatter) ->
+  init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
+init([Level, {SDataId, LagerMD}, {Formatter, FormatterConfig}])
+  when is_atom(Formatter) ->
+    {ok, #state{
+        log_level=level_to_mask(Level),
+        structured_data_id=SDataId,
+        lager_metadata_keys=LagerMD,
+        formatter=Formatter,
+        format_config=FormatterConfig
+    }}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -84,14 +107,17 @@ handle_event({log, Level, _, [_, Location, Message]}, State)
     Timestamp = os:timestamp(),
     syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format),
     {ok, State};
-handle_event({log, Msg}, State = #state{log_level = Level}) ->
+handle_event({log, Msg}, State = #state{log_level=Level, formatter=Formatter,
+  format_config=FormatterConfig, lager_metadata_keys=MDKeys,
+  structured_data_id=SDataID}) ->
     case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
         true ->
             Severity = get_severity(Msg),
             Pid = get_pid(Msg),
             Timestamp = apply(lager_msg, timestamp, [Msg]),
-            Message = apply(lager_default_formatter, format, [Msg, ?CFG]),
-            syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format);
+            Message = apply(Formatter, format, [Msg, FormatterConfig]),
+            SD = metadata_to_structured_data(SDataID, MDKeys, Msg),
+            syslog_logger:log(Severity, Pid, Timestamp, SD, Message, no_format);
         false ->
             ok
     end,
@@ -171,3 +197,21 @@ level_to_mask(Level) ->
     catch
         error:undef -> apply(lager_util, level_to_num, [Level])
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+metadata_to_structured_data(undefined, _, _) ->
+    [];
+metadata_to_structured_data(_, [], _) ->
+    [];
+metadata_to_structured_data(SDataID, MDKey, Msg) ->
+    Result = lists:filter(
+        fun({K, _}) -> lists:member(K, MDKey) end,
+        lager_msg:metadata(Msg)
+    ),
+    case Result of
+        [] ->     [];
+        Result -> [{SDataID, Result}]
+    end.
+
