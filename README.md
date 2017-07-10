@@ -236,18 +236,16 @@ It can handle more complex options such as below
     ]}
 ]}.
 ```
-It will handle being supplying custom formatter and message like the existing 
-`lager` backends. 
+It will also handle custom formatters like other existing `lager` backends.
 
-One additional feature this backend provides is the optional ability to store 
-the metadata from a `lager` message into the _STRUCTURED-DATA_ part of a 
-RFC 5424 message. It takes a tuple with first element being the 
-_STRUCTURED-DATA_ id, and the second element being a list of atoms 
-corresponding to the metadata key whose values you want to pack. If you don't 
-want to forward any of the metadata or are using RFC3164 then you can supply 
-an empty tuple `{}`. Any metadata keys which you are looking for which do not
-exist will not get put into the _STRUCTURED-DATA_  
-
+One additional feature this backend provides is the optional ability to store
+the metadata from a `lager` message into the _STRUCTURED-DATA_ part of a
+RFC 5424 message. It takes a tuple with first element being the
+_STRUCTURED-DATA_ id, and the second element being a list of atoms
+corresponding to the metadata key whose values you want to pack. If you don't
+want to forward any of the metadata or are using RFC 3164 then you can supply
+an empty tuple `{}`. Only metadata matching the configured keys will be included
+into the _STRUCTURED-DATA_
 
 Performance
 -----------
@@ -330,6 +328,9 @@ History
 ### Master (3.2.1)
 
 * Try to reopen the transport periodically on transport failures/errors (#11).
+* Support for configurable conversion of `lager` metadata to _STRUCTURED-DATA_
+  (thanks to @walrusVision)
+* Support for custom formatters in the `lager` backend (thanks to @walrusVision)
 
 ### 3.2.0
 
