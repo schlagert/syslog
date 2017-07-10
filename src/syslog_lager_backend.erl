@@ -67,35 +67,29 @@ set_log_level(Level) ->
 %%%=============================================================================
 
 -record(state, {
-    log_level :: integer() | {mask, integer()},
-    formatter :: atom(),
-    format_config :: list(),
-    structured_data_id :: string() | undefined,
-    lager_metadata_keys :: [atom()]
-}).
+    log_level     :: integer() | {mask, integer()},
+    formatter     :: atom(),
+    format_cfg    :: list(),
+    sd_id         :: string() | undefined,
+    metadata_keys :: [atom()]}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    init([syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL),
-        {},
-        {lager_default_formatter, ?CFG}
-    ]);
+    init([syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)]);
 init([Level]) ->
     init([Level, {}, {lager_default_formatter, ?CFG}]);
-init([Level, {}, {Formatter, FormatterConfig}])
-  when is_atom(Formatter) ->
-  init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
-init([Level, {SDataId, LagerMD}, {Formatter, FormatterConfig}])
+init([Level, {}, {Formatter, FormatterConfig}]) when is_atom(Formatter) ->
+    init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
+init([Level, {SDataId, MDKeys}, {Formatter, FormatterConfig}])
   when is_atom(Formatter) ->
     {ok, #state{
-        log_level=level_to_mask(Level),
-        structured_data_id=SDataId,
-        lager_metadata_keys=LagerMD,
-        formatter=Formatter,
-        format_config=FormatterConfig
-    }}.
+            log_level = level_to_mask(Level),
+            sd_id = SDataId,
+            metadata_keys = MDKeys,
+            formatter = Formatter,
+            format_cfg = FormatterConfig}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -107,16 +101,14 @@ handle_event({log, Level, _, [_, Location, Message]}, State)
     Timestamp = os:timestamp(),
     syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format),
     {ok, State};
-handle_event({log, Msg}, State = #state{log_level=Level, formatter=Formatter,
-  format_config=FormatterConfig, lager_metadata_keys=MDKeys,
-  structured_data_id=SDataID}) ->
+handle_event({log, Msg}, State = #state{log_level = Level}) ->
     case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
         true ->
             Severity = get_severity(Msg),
             Pid = get_pid(Msg),
             Timestamp = apply(lager_msg, timestamp, [Msg]),
-            Message = apply(Formatter, format, [Msg, FormatterConfig]),
-            SD = metadata_to_structured_data(SDataID, MDKeys, Msg),
+            Message = format_msg(Msg, State),
+            SD = metadata_to_sd(Msg, State),
             syslog_logger:log(Severity, Pid, Timestamp, SD, Message, no_format);
         false ->
             ok
@@ -176,12 +168,12 @@ get_severity(Msg) ->
 get_pid(Location) when is_list(Location) ->
     Location;
 get_pid(Msg) ->
-    try
-        Metadata = apply(lager_msg, metadata, [Msg]),
-        case lists:keyfind(pid, 1, Metadata) of
-            {pid, Pid} when is_pid(Pid) -> Pid;
-            _                           -> self()
-        end
+    try apply(lager_msg, metadata, [Msg]) of
+        Metadata ->
+            case lists:keyfind(pid, 1, Metadata) of
+                {pid, Pid} when is_pid(Pid) -> Pid;
+                _                           -> self()
+            end
     catch
         _:_ -> self()
     end.
@@ -201,17 +193,23 @@ level_to_mask(Level) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-metadata_to_structured_data(undefined, _, _) ->
+metadata_to_sd(_Msg, #state{sd_id = undefined}) ->
     [];
-metadata_to_structured_data(_, [], _) ->
+metadata_to_sd(_Msg, #state{metadata_keys = []}) ->
     [];
-metadata_to_structured_data(SDataID, MDKey, Msg) ->
-    Result = lists:filter(
-        fun({K, _}) -> lists:member(K, MDKey) end,
-        lager_msg:metadata(Msg)
-    ),
-    case Result of
-        [] ->     [];
-        Result -> [{SDataID, Result}]
+metadata_to_sd(Msg, #state{sd_id = SDataId, metadata_keys = MDKeys}) ->
+    try apply(lager_msg, metadata, [Msg]) of
+        Metadata ->
+            case [D || D = {K, _} <- Metadata, lists:member(K, MDKeys)] of
+                []     -> [];
+                Result -> [{SDataId, Result}]
+            end
+    catch
+        _:_ -> []
     end.
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+format_msg(Msg, #state{formatter = Formatter, format_cfg = FormatterConfig}) ->
+    apply(Formatter, format, [Msg, FormatterConfig]).
