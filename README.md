@@ -219,6 +219,36 @@ logging into `syslog` you can use something like the following in your
 {lager, [{handlers, [{syslog_lager_backend, []}]}]}
 ```
 
+You can explicitly specify the logging level
+```erlang
+{lager, [{handlers, [{syslog_lager_backend, [info]}]}]}
+```
+
+It can handle more complex options such as below
+```erlang
+{lager, [
+    {handlers, [
+        {syslog_lager_backend, [
+          debug,                                 %% Level
+          {"sdata_id", [application, pid]},      %% STRUCTURED-DATA
+          {lager_default_formatter, [message]}   %% Lager formatting
+        ]}
+    ]}
+]}.
+```
+It will handle being supplying custom formatter and message like the existing 
+`lager` backends. 
+
+One additional feature this backend provides is the optional ability to store 
+the metadata from a `lager` message into the _STRUCTURED-DATA_ part of a 
+RFC 5424 message. It takes a tuple with first element being the 
+_STRUCTURED-DATA_ id, and the second element being a list of atoms 
+corresponding to the metadata key whose values you want to pack. If you don't 
+want to forward any of the metadata or are using RFC3164 then you can supply 
+an empty tuple `{}`. Any metadata keys which you are looking for which do not
+exist will not get put into the _STRUCTURED-DATA_  
+
+
 Performance
 -----------
 

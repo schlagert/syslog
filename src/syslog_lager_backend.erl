@@ -66,13 +66,30 @@ set_log_level(Level) ->
 %%% gen_event callbacks
 %%%=============================================================================
 
--record(state, {log_level :: integer() | {mask, integer()}}).
+-record(state, {
+    log_level     :: integer() | {mask, integer()},
+    formatter     :: atom(),
+    format_cfg    :: list(),
+    sd_id         :: string() | undefined,
+    metadata_keys :: [atom()]}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([])      -> init([syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)]);
-init([Level]) -> {ok, #state{log_level = level_to_mask(Level)}}.
+init([]) ->
+    init([syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL)]);
+init([Level]) ->
+    init([Level, {}, {lager_default_formatter, ?CFG}]);
+init([Level, {}, {Formatter, FormatterConfig}]) when is_atom(Formatter) ->
+    init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
+init([Level, {SDataId, MDKeys}, {Formatter, FormatterConfig}])
+  when is_atom(Formatter) ->
+    {ok, #state{
+            log_level = level_to_mask(Level),
+            sd_id = SDataId,
+            metadata_keys = MDKeys,
+            formatter = Formatter,
+            format_cfg = FormatterConfig}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -90,8 +107,9 @@ handle_event({log, Msg}, State = #state{log_level = Level}) ->
             Severity = get_severity(Msg),
             Pid = get_pid(Msg),
             Timestamp = apply(lager_msg, timestamp, [Msg]),
-            Message = apply(lager_default_formatter, format, [Msg, ?CFG]),
-            syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format);
+            Message = format_msg(Msg, State),
+            SD = metadata_to_sd(Msg, State),
+            syslog_logger:log(Severity, Pid, Timestamp, SD, Message, no_format);
         false ->
             ok
     end,
@@ -150,12 +168,12 @@ get_severity(Msg) ->
 get_pid(Location) when is_list(Location) ->
     Location;
 get_pid(Msg) ->
-    try
-        Metadata = apply(lager_msg, metadata, [Msg]),
-        case lists:keyfind(pid, 1, Metadata) of
-            {pid, Pid} when is_pid(Pid) -> Pid;
-            _                           -> self()
-        end
+    try apply(lager_msg, metadata, [Msg]) of
+        Metadata ->
+            case lists:keyfind(pid, 1, Metadata) of
+                {pid, Pid} when is_pid(Pid) -> Pid;
+                _                           -> self()
+            end
     catch
         _:_ -> self()
     end.
@@ -171,3 +189,27 @@ level_to_mask(Level) ->
     catch
         error:undef -> apply(lager_util, level_to_num, [Level])
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+metadata_to_sd(_Msg, #state{sd_id = undefined}) ->
+    [];
+metadata_to_sd(_Msg, #state{metadata_keys = []}) ->
+    [];
+metadata_to_sd(Msg, #state{sd_id = SDataId, metadata_keys = MDKeys}) ->
+    try apply(lager_msg, metadata, [Msg]) of
+        Metadata ->
+            case [D || D = {K, _} <- Metadata, lists:member(K, MDKeys)] of
+                []     -> [];
+                Result -> [{SDataId, Result}]
+            end
+    catch
+        _:_ -> []
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+format_msg(Msg, #state{formatter = Formatter, format_cfg = FormatterConfig}) ->
+    apply(Formatter, format, [Msg, FormatterConfig]).
