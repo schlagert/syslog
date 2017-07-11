@@ -88,7 +88,7 @@
 %% @end
 %%------------------------------------------------------------------------------
 -spec debug_msg(io:format()) -> ok.
-debug_msg(Msg) -> debug_msg(Msg, no_format).
+debug_msg(Msg) -> debug_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -105,7 +105,7 @@ debug_msg(Fmt, Args) -> msg(debug, Fmt, Args).
 %% @end
 %%------------------------------------------------------------------------------
 -spec info_msg(io:format()) -> ok.
-info_msg(Msg) -> info_msg(Msg, no_format).
+info_msg(Msg) -> info_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -123,7 +123,7 @@ info_msg(Fmt, Args) -> msg(informational, Fmt, Args).
 %% @end
 %%------------------------------------------------------------------------------
 -spec warning_msg(io:format()) -> ok.
-warning_msg(Msg) -> warning_msg(Msg, no_format).
+warning_msg(Msg) -> warning_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -141,7 +141,7 @@ warning_msg(Fmt, Args) -> msg(warning, Fmt, Args).
 %% @end
 %%------------------------------------------------------------------------------
 -spec error_msg(io:format()) -> ok.
-error_msg(Msg) -> error_msg(Msg, no_format).
+error_msg(Msg) -> error_msg(Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -158,7 +158,7 @@ error_msg(Fmt, Args) -> msg(error, Fmt, Args).
 %% @end
 %%------------------------------------------------------------------------------
 -spec msg(severity(), io:format()) -> ok.
-msg(Severity, Msg) -> msg(Severity, Msg, no_format).
+msg(Severity, Msg) -> msg(Severity, Msg, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
