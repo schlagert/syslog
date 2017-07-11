@@ -325,7 +325,7 @@ TODO more details?
 History
 -------
 
-### Master (3.2.1)
+### 3.3.0
 
 * Try to reopen the transport periodically on transport failures/errors (#11).
 * Support for configurable conversion of `lager` metadata to _STRUCTURED-DATA_
