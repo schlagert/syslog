@@ -170,7 +170,8 @@ log_msg(Severity, Pid, Fmt, Args, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 log_report(_, Pid, crash_report, Report, State) ->
-    log_crash(State#state.extra_report, Pid, Report, State);
+    %% init (<0.0.0>) is the group_leader of all group_leaders
+    log_crash(State#state.extra_report, init, Pid, Report, State);
 log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
     log_msg(informational, Pid, "started application ~s on node ~s", [A, N], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = true}) ->
@@ -204,15 +205,15 @@ log_report(Severity, Pid, _, Report, State = #state{verbose = {false, D}}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log_crash(false, Pid, Report, State) ->
+log_crash(false, Fd, Pid, Report, State) ->
     Timestamp = os:timestamp(),
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
-    Msg = sasl_report:format_report(fd, all, Event),
+    Msg = sasl_report:format_report(Fd, all, Event),
     syslog_logger:async_log(crash, Pid, Timestamp, [], Msg, no_format),
     State;
-log_crash(true, Pid, Report = [SubReport | _], State) ->
-    NewState = log_crash(false, Pid, Report, State),
+log_crash(true, Fd, Pid, Report = [SubReport | _], State) ->
+    NewState = log_crash(false, Fd, Pid, Report, State),
     try proplists:get_value(error_info, SubReport) of
         {Class, {Reason, [{M, F, Args, Ps} | _]}, _} when is_list(Args) ->
             As = string:join([io_lib:format("~w", [A]) || A <- Args], ","),
