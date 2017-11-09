@@ -327,7 +327,7 @@ History
 
 ### Master (3.3.1)
 
-* No changes to latest tag
+* Fix compatibility to OTP 20.1
 
 ### 3.3.0
 
