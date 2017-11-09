@@ -332,7 +332,7 @@ TODO more details?
 History
 -------
 
-### Master (3.3.1)
+### 3.4.0
 
 * Fix compatibility to OTP 20.1
 * Allow certain configuration values to be set as string/binary. This especially
