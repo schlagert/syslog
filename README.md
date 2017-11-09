@@ -94,7 +94,7 @@ are available and can be configured in the application environment:
   Specifies whether the RFC5424 protocol backend should include the UTF-8 BOM
   in the message part of a Syslog packet. Default is `false`.
 
-* `{dest_host, inet:ip_address() | inet:hostname()}`
+* `{dest_host, inet:ip_address()}`
 
   Specifies the host to which Syslog packets will be sent. Default is
   `{127, 0, 0, 1}`.
@@ -328,6 +328,10 @@ History
 ### Master (3.3.1)
 
 * Fix compatibility to OTP 20.1
+* Allow certain configuration values to be set as string/binary. This especially
+  applies to the `dest_host` and `dest_port` options, e.g. it is now possible to
+  set addresses like "127.0.0.1" or "::1" as `dest_host`.
+  (thanks to @ogolosovskiy)
 
 ### 3.3.0
 

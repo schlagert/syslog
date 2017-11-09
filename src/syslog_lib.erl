@@ -25,6 +25,7 @@
          get_domain/0,
          get_name/0,
          get_property/2,
+         get_property/3,
          get_pid/1,
          get_utc_datetime/1,
          get_utc_offset/2,
@@ -86,10 +87,8 @@ get_domain(Hostname) ->
 -spec get_name() -> binary().
 get_name() ->
     case ?GET_ENV(app_name) of
-        {ok, Name} when is_binary(Name) -> Name;
-        {ok, Name} when is_list(Name)   -> list_to_binary(Name);
-        {ok, Name} when is_atom(Name)   -> atom_to_binary(Name, utf8);
-        undefined                       -> get_name_from_node(node())
+        {ok, Name} -> to_type(binary, Name);
+        undefined  -> get_name_from_node(node())
     end.
 
 %%------------------------------------------------------------------------------
@@ -100,9 +99,22 @@ get_name() ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_property(atom(), term()) -> term().
-get_property(Property, Default) -> get_property_(?GET_ENV(Property), Default).
-get_property_({ok, Value}, _)   -> Value;
-get_property_(_, Value)         -> Value.
+get_property(Property, Default) ->
+    case {?GET_ENV(Property), Default} of
+        {{ok, Value}, _} -> Value;
+        {_, Value}       -> Value
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Similar to {@link get_property/2}. Additionally, this function allows to
+%% specifiy the desired target type. The configured value will be converted to
+%% the desired type. If this is not possible, the function crashes.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_property(atom(), term(), binary | integer | ip_addr) -> term().
+get_property(Property, Default, Type) ->
+    to_type(Type, get_property(Property, Default)).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -111,15 +123,13 @@ get_property_(_, Value)         -> Value.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_pid(pid() | atom() | string()) -> binary().
-get_pid(N) when is_list(N) ->
-    list_to_binary(N);
-get_pid(N) when is_atom(N) ->
-    atom_to_binary(N, utf8);
 get_pid(P) when is_pid(P) ->
     case catch process_info(P, registered_name) of
-        {registered_name, N} -> atom_to_binary(N, utf8);
-        _                    -> list_to_binary(pid_to_list(P))
-    end.
+        {registered_name, N} -> to_type(binary, N);
+        _                    -> to_type(binary, P)
+    end;
+get_pid(N) ->
+    to_type(binary, N).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -306,6 +316,30 @@ micro(M) when M < 10000  -> ["00", integer_to_list(M)];
 micro(M) when M < 100000 -> ["0", integer_to_list(M)];
 micro(M)                 -> integer_to_list(M).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_type(binary, V) when is_binary(V) ->
+    V;
+to_type(binary, V) when is_list(V) ->
+    list_to_binary(V);
+to_type(binary, V) when is_atom(V) ->
+    atom_to_binary(V, utf8);
+to_type(integer, V) when is_integer(V) ->
+    V;
+to_type(integer, V) when is_list(V) ->
+    list_to_integer(V);
+to_type(ip_addr, V) when is_tuple(V) ->
+    V;
+to_type(ip_addr, V) when is_list(V) ->
+    element(2, {ok, _} = inet:parse_address(V));
+to_type(Type, V) when is_pid(V) ->
+    to_type(Type, pid_to_list(V));
+to_type(Type, V) when is_integer(V) ->
+    to_type(Type, integer_to_list(V));
+to_type(Type, V) when is_binary(V) ->
+    to_type(Type, binary_to_list(V)).
+
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
@@ -365,5 +399,18 @@ format_rfc5424_date_test() ->
     Date = format_rfc5424_date(Datetime),
     Rx = "2013-04-06T\\d\\d:\\d\\d:56\\.908235(Z|(\\+|-)\\d\\d:\\d\\d)",
     ?assertMatch({match, _}, re:run(lists:flatten(Date), Rx)).
+
+to_type_test() ->
+    ?assertEqual(<<"1">>, to_type(binary, <<"1">>)),
+    ?assertEqual(<<"1">>, to_type(binary, "1")),
+    ?assertEqual(<<"1">>, to_type(binary, 1)),
+    ?assert(is_binary(to_type(binary, self()))),
+    ?assertEqual(<<"1">>, to_type(binary, '1')),
+    ?assertEqual(1, to_type(integer, <<"1">>)),
+    ?assertEqual(1, to_type(integer, "1")),
+    ?assertEqual(1, to_type(integer, 1)),
+    ?assertEqual({127,0,0,1}, to_type(ip_addr, <<"127.0.0.1">>)),
+    ?assertEqual({127,0,0,1}, to_type(ip_addr, "127.0.0.1")),
+    ?assertEqual({0,0,0,0,0,0,0,1}, to_type(ip_addr, "::1")).
 
 -endif. %% TEST

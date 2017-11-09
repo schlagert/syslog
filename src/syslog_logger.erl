@@ -193,8 +193,8 @@ init([]) ->
     catch process_flag(message_queue_data, off_heap),
     State = #state{
                protocol = syslog_lib:get_property(protocol, ?PROTOCOL),
-               dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST),
-               dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT)},
+               dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST, ip_addr),
+               dest_port = syslog_lib:get_property(dest_port, ?DEST_PORT, integer)},
     LogLevel = syslog_lib:get_property(log_level, ?SYSLOG_LOGLEVEL),
     {ok, set_opts(LogLevel, init_transport(State))}.
 
@@ -294,7 +294,7 @@ open_device_impl(Module, Fun, Args, State) ->
             State#state{device = {Module, Device}};
         Error ->
             ?ERR("~s - Failed to open transport ~w~n", [?MODULE, Error]),
-            Time = syslog_lib:get_property(retry_timeout, ?TIMEOUT),
+            Time = syslog_lib:get_property(retry_timeout, ?TIMEOUT, integer),
             State#state{timer = erlang:start_timer(Time, self(), open_device)}
     end.
 
@@ -507,7 +507,7 @@ get_transport(P) when is_atom(P)    -> get_transport({P, ?TRANSPORT}).
 %% @private
 %%------------------------------------------------------------------------------
 get_function(true)  -> cast;
-get_function(false) -> {call, syslog_lib:get_property(timeout, ?TIMEOUT)}.
+get_function(false) -> {call, syslog_lib:get_property(timeout, ?TIMEOUT, integer)}.
 
 %%------------------------------------------------------------------------------
 %% @private
