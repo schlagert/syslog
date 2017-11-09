@@ -59,7 +59,9 @@
 -define(PROTOCOL, rfc3164).
 -define(TRANSPORT, udp).
 -define(TIMEOUT, 1000).
+-define(MULTILINE, false).
 
+-define(SEPARATORS, [<<"\n">>, <<"\r">>]).
 -define(TCP_OPTS, [{keepalive, true},
                    {reuseaddr, true},
                    {send_timeout, ?TIMEOUT},
@@ -71,6 +73,7 @@
           protocol       :: module(),
           facility       :: syslog:facility(),
           crash_facility :: syslog:facility(),
+          multiline      :: boolean(),
           cfg            :: #syslog_cfg{}}).
 
 %%%=============================================================================
@@ -341,15 +344,27 @@ maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, Opts) ->
 do_log(Severity, Pid, Timestamp, StructuredData, Msg, Opts) ->
     PRI = pri(Severity, Opts),
     HDR = hdr(Pid, Timestamp, Opts),
-    lists:foreach(
-      fun(<<>>) when StructuredData =:= [] ->
-              ok;
-         (Message) ->
-              case msg(StructuredData, Message, Opts) of
-                  <<>> -> ok;
-                  MSG  -> forward(Msg, iolist_to_binary([PRI, HDR, MSG]), Opts)
-              end
-      end, binary:split(iolist_to_binary(Msg), [<<"\n">>, <<"\r">>], [global])).
+    MSG = iolist_to_binary(Msg),
+    Fun = do_log_fun(PRI, HDR, StructuredData, Opts),
+    case Opts#opts.multiline of
+        true ->
+            Fun(MSG);
+        false ->
+            lists:foreach(Fun, binary:split(MSG, ?SEPARATORS, [global]))
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+do_log_fun(PRI, HDR, StructuredData, Opts) ->
+    fun(<<>>) when StructuredData =:= [] ->
+            ok;
+       (Msg) ->
+            case msg(StructuredData, Msg, Opts) of
+                <<>> -> ok;
+                MSG  -> forward(Msg, iolist_to_binary([PRI, HDR, MSG]), Opts)
+            end
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -398,6 +413,7 @@ new_opts(Level, Protocol) ->
        protocol = get_protocol(Protocol),
        facility = syslog_lib:get_property(facility, ?FACILITY),
        crash_facility = syslog_lib:get_property(crash_facility, ?FACILITY),
+       multiline = syslog_lib:get_property(multiline_mode, ?MULTILINE),
        cfg = new_cfg()}.
 
 %%------------------------------------------------------------------------------

@@ -166,6 +166,13 @@ are available and can be configured in the application environment:
   Specifies whether `syslog` will handle messages from the `error_logger`.
   Default is `true`.
 
+* `{multiline_mode, boolean()}`
+
+  Specifies whether `syslog` will send messages potentially containing multiline
+  strings. Please be aware, that many Syslog servers will not be able to handle
+  multiline messages well, e.g. will insert garbage characters for a newline
+  character. Default is `false`.
+
 If your application really needs fast asynchronous logging and you like to live
 dangerously, logging can be done either with the `error_logger` or the `syslog`
 API and the `syslog` application should be configured with `{async, true}` and
@@ -332,6 +339,8 @@ History
   applies to the `dest_host` and `dest_port` options, e.g. it is now possible to
   set addresses like "127.0.0.1" or "::1" as `dest_host`.
   (thanks to @ogolosovskiy)
+* Support for optional `multiline` mode, which prevents `syslog` from splitting
+  message strings at newline separators (thanks to @ogolosovskiy)
 
 ### 3.3.0
 
