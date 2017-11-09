@@ -332,6 +332,10 @@ TODO more details?
 History
 -------
 
+### Master (3.4.1)
+
+No changes to latest tag
+
 ### 3.4.0
 
 * Fix compatibility to OTP 20.1
