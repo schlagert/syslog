@@ -332,13 +332,14 @@ TODO more details?
 History
 -------
 
-### Master (3.4.1)
+### 3.4.1
 
-No changes to latest tag
+* Fix compatibility to OTP 20.1
 
 ### 3.4.0
 
-* Fix compatibility to OTP 20.1
+* Due to a bug, this release is *not* compatible with OTP 20.1, use release 3.4.1
+  instead.
 * Allow certain configuration values to be set as string/binary. This especially
   applies to the `dest_host` and `dest_port` options, e.g. it is now possible to
   set addresses like "127.0.0.1" or "::1" as `dest_host`.
