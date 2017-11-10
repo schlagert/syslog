@@ -56,6 +56,7 @@
 -record(state, {
           msgs_to_drop = 0    :: non_neg_integer(),
           dropped = {0, 0, 0} :: {integer(), integer(), integer()},
+          init_pid            :: pid(),
           no_progress         :: boolean(),
           verbose             :: true | {false, pos_integer()},
           msg_queue_limit     :: pos_integer() | infinity,
@@ -69,6 +70,11 @@ init(_Arg) ->
     Facility = syslog_lib:get_property(facility, ?FACILITY),
     CrashFacility = syslog_lib:get_property(crash_facility, ?FACILITY),
     {ok, #state{
+            %% Starting with OTP 20.1 one does need a valid group_leader to call
+            %% sasl_format:format_report/3. Since init (<0.0.0>) is the
+            %% group_leader of all group_leaders and thus kind of static, we'll
+            %% use that to determine the supported system encoding.
+            init_pid        = whereis(init),
             no_progress     = syslog_lib:get_property(no_progress, ?NO_PROGRESS),
             verbose         = syslog_lib:get_property(verbose, ?VERBOSITY),
             msg_queue_limit = syslog_lib:get_property(msg_queue_limit, ?LIMIT),
@@ -170,8 +176,7 @@ log_msg(Severity, Pid, Fmt, Args, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 log_report(_, Pid, crash_report, Report, State) ->
-    %% init (<0.0.0>) is the group_leader of all group_leaders
-    log_crash(State#state.extra_report, init, Pid, Report, State);
+    log_crash(State#state.extra_report, Pid, Report, State);
 log_report(_, Pid, _, [{application, A}, {started_at, N} | _], State) ->
     log_msg(informational, Pid, "started application ~s on node ~s", [A, N], State);
 log_report(_, Pid, _, [{application, A}, {exited, R} | _], State = #state{verbose = true}) ->
@@ -190,11 +195,11 @@ log_report(_, Pid, progress, Report, State = #state{verbose = {false, D}}) ->
     Child = syslog_lib:get_pid(proplists:get_value(pid, Details)),
     Mfargs = proplists:get_value(mfargs, Details),
     log_msg(informational, Pid, "started child ~s with ~P", [Child, Mfargs, D], State);
-log_report(_, Pid, supervisor_report, Report, State) ->
+log_report(_, Pid, supervisor_report, Report, State = #state{init_pid = Init}) ->
     Timestamp = os:timestamp(),
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, supervisor_report, Report}}},
-    Msg = sasl_report:format_report(fd, all, Event),
+    Msg = sasl_report:format_report(Init, all, Event),
     syslog_logger:async_log(crash, Pid, Timestamp, [], Msg, no_format),
     State;
 log_report(Severity, Pid, _, Report, State = #state{verbose = true}) ->
@@ -205,15 +210,15 @@ log_report(Severity, Pid, _, Report, State = #state{verbose = {false, D}}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log_crash(false, Fd, Pid, Report, State) ->
+log_crash(false, Pid, Report, State = #state{init_pid = Init}) ->
     Timestamp = os:timestamp(),
     Time = calendar:now_to_local_time(Timestamp),
     Event = {Time, {error_report, self(), {Pid, crash_report, Report}}},
-    Msg = sasl_report:format_report(Fd, all, Event),
+    Msg = sasl_report:format_report(Init, all, Event),
     syslog_logger:async_log(crash, Pid, Timestamp, [], Msg, no_format),
     State;
-log_crash(true, Fd, Pid, Report = [SubReport | _], State) ->
-    NewState = log_crash(false, Fd, Pid, Report, State),
+log_crash(true, Pid, Report = [SubReport | _], State) ->
+    NewState = log_crash(false, Pid, Report, State),
     try proplists:get_value(error_info, SubReport) of
         {Class, {Reason, [{M, F, Args, Ps} | _]}, _} when is_list(Args) ->
             As = string:join([io_lib:format("~w", [A]) || A <- Args], ","),
