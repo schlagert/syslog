@@ -332,9 +332,9 @@ TODO more details?
 History
 -------
 
-### Master (3.4.2)
+### 3.4.2
 
-No changes to latest tag
+* Fix unicode logging (using `~ts` or `~tc`)
 
 ### 3.4.1
 
