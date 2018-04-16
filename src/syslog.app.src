@@ -15,7 +15,7 @@
 %%%=============================================================================
 {application, syslog,
  [
-  {description, "A Syslog-based logging framework."},
+  {description, "An RFC 3164 and RFC 5424 compliant logging framework."},
   {vsn, "3.4.2"},
   {registered,
    [

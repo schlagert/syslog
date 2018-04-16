@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright (c) 2013-2017 Tobias Schlager <schlagert@github.com>
+%%% Copyright (c) 2013-2018 Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -344,7 +344,7 @@ maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, Opts) ->
 do_log(Severity, Pid, Timestamp, StructuredData, Msg, Opts) ->
     PRI = pri(Severity, Opts),
     HDR = hdr(Pid, Timestamp, Opts),
-    MSG = iolist_to_binary(Msg),
+    MSG = unicode:characters_to_binary(Msg),
     Fun = do_log_fun(PRI, HDR, StructuredData, Opts),
     case Opts#opts.multiline of
         true ->

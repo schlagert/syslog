@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2016-2017, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2016-2018, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -190,6 +190,26 @@ error_logger_test_() ->
              Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
                  Proc ++ " - exited with {exit,test_reason}",
              ?assertEqual(ok, wait_for(Devices, Re)),
+
+             teardown(Devices)
+     end}.
+
+unicode_test_() ->
+    {timeout,
+     5,
+     fun() ->
+             Devices = setup(rfc5424, udp, debug),
+
+             Proc = pid_to_list(self()),
+             Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
+
+             {ok, Compiled} = re:compile(<<"<31>1 "/utf8,
+                                           (list_to_binary(Date))/binary,
+                                           " .+ \\w+ \\d+ "/utf8,
+                                           (list_to_binary(Proc))/binary,
+                                           " - äöü"/utf8>>, []),
+             ?assertEqual(ok, syslog:debug_msg("~ts", [<<"äöü"/utf8>>])),
+             ?assertMatch({match, _}, re:run(read(Devices), Compiled)),
 
              teardown(Devices)
      end}.
