@@ -332,6 +332,10 @@ TODO more details?
 History
 -------
 
+### Master (3.4.3)
+
+No changes to latest tag
+
 ### 3.4.2
 
 * Fix unicode logging (using `~ts` or `~tc`)
