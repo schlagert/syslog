@@ -171,8 +171,9 @@ get_pid(Msg) ->
     try apply(lager_msg, metadata, [Msg]) of
         Metadata ->
             case lists:keyfind(pid, 1, Metadata) of
-                {pid, Pid} when is_pid(Pid) -> Pid;
-                _                           -> self()
+                {pid, Pid} when is_pid(Pid)    -> Pid;
+                {pid, List} when is_list(List) -> List;
+                _                              -> self()
             end
     catch
         _:_ -> self()
