@@ -334,7 +334,8 @@ History
 
 ### Master (3.4.3)
 
-No changes to latest tag
+* Add support for process ids formatted as strings in `lager` metadata (thanks
+  to @hairyhum)
 
 ### 3.4.2
 
