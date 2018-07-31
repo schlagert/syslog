@@ -219,6 +219,7 @@ set_log_mode(Mode) -> syslog_logger:set_log_mode(Mode).
 %% @private
 %%------------------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
+    ok = syslog_lib:ensure_error_logger(),
     DisableTty = syslog_lib:get_property(disable_tty, true),
     ok = iff(DisableTty, fun() -> error_logger:tty(false) end),
     case supervisor:start_link(?MODULE, []) of

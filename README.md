@@ -336,6 +336,11 @@ History
 
 * Add support for process ids formatted as strings in `lager` metadata (thanks
   to @hairyhum)
+* Add basic support for OTP 21. This will make `syslog` _work_ with the new
+  `logger` API. But be aware that this is only a hack involving the start of the
+  legacy `error_logger`. If you want to use this, *do not forget* to set the
+  `kernel` environment variable `logger_sasl_compatible` to `true` in your
+  release. Unfortunately, the unit tests don't work with OTP 21.
 
 ### 3.4.2
 

@@ -31,7 +31,8 @@
          get_utc_offset/2,
          truncate/2,
          format_rfc3164_date/1,
-         format_rfc5424_date/1]).
+         format_rfc5424_date/1,
+         ensure_error_logger/0]).
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
 
@@ -197,9 +198,41 @@ format_rfc3164_date({UtcDatetime, _MicroSecs}) ->
 format_rfc3164_date_({{_, Mo, D}, {H, Mi, S}}) ->
     [month(Mo), " ", day(D), " ", digit(H), $:, digit(Mi), $:, digit(S)].
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Start the `error_logger' process if not running and block the calling process
+%% until the `error_logger' is started and registered by name.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ensure_error_logger() -> ok | {error, term()}.
+ensure_error_logger() ->
+    case whereis(error_logger) of
+        P when is_pid(P) ->
+            ok;
+        undefined ->
+            %% See error_logger:add_report_handler/3
+            wait_for_error_logger(
+              logger:add_handler(
+                error_logger,
+                error_logger,
+                #{level => info, filter_default => log}))
+    end.
+
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+wait_for_error_logger(ok) ->
+    try gen_event:which_handlers(error_logger) of
+        L when is_list(L) -> ok
+    catch
+        exit:noproc -> wait_for_error_logger(timer:sleep(100))
+    end;
+wait_for_error_logger(Error) ->
+    Error.
 
 %%------------------------------------------------------------------------------
 %% @private
