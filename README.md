@@ -94,7 +94,7 @@ are available and can be configured in the application environment:
   Specifies whether the RFC5424 protocol backend should include the UTF-8 BOM
   in the message part of a Syslog packet. Default is `false`.
 
-* `{dest_host, inet:ip_address()}`
+* `{dest_host, inet:ip_address() | inet:hostname()}`
 
   Specifies the host to which Syslog packets will be sent. Default is
   `{127, 0, 0, 1}`.
