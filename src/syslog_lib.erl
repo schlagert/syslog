@@ -365,13 +365,31 @@ to_type(integer, V) when is_list(V) ->
 to_type(ip_addr, V) when is_tuple(V) ->
     V;
 to_type(ip_addr, V) when is_list(V) ->
-    element(2, {ok, _} = inet:parse_address(V));
+    to_ip_addr_type(V);
 to_type(Type, V) when is_pid(V) ->
     to_type(Type, pid_to_list(V));
 to_type(Type, V) when is_integer(V) ->
     to_type(Type, integer_to_list(V));
 to_type(Type, V) when is_binary(V) ->
     to_type(Type, binary_to_list(V)).
+
+to_ip_addr_type(V) ->
+    handle_inet_parse_address(inet:parse_address(V), V).
+
+handle_inet_parse_address({error, einval}, V) ->
+    try_inet_getaddr(V, [inet, inet6]);
+handle_inet_parse_address({ok, IpAddr}, _V) ->
+    IpAddr.
+
+try_inet_getaddr(V, [AddrFamily|Rest]) ->
+    handle_inet_getaddr(inet:getaddr(V, AddrFamily), V, Rest).
+
+handle_inet_getaddr(_, _, []) ->
+    error(invalid_dest_host);
+handle_inet_getaddr({error, _}, V, AddrFamilies) ->
+    try_inet_getaddr(V, AddrFamilies);
+handle_inet_getaddr({ok, IpAddr}, _, _) ->
+    IpAddr.
 
 %%%=============================================================================
 %%% TESTS
@@ -442,8 +460,11 @@ to_type_test() ->
     ?assertEqual(1, to_type(integer, <<"1">>)),
     ?assertEqual(1, to_type(integer, "1")),
     ?assertEqual(1, to_type(integer, 1)),
+    ?assertEqual({127,0,0,1}, to_type(ip_addr, "localhost")),
+    ?assertEqual({127,0,0,1}, to_type(ip_addr, <<"localhost">>)),
     ?assertEqual({127,0,0,1}, to_type(ip_addr, <<"127.0.0.1">>)),
     ?assertEqual({127,0,0,1}, to_type(ip_addr, "127.0.0.1")),
-    ?assertEqual({0,0,0,0,0,0,0,1}, to_type(ip_addr, "::1")).
+    ?assertEqual({0,0,0,0,0,0,0,1}, to_type(ip_addr, "::1")),
+    ?assertError(invalid_dest_host, to_type(ip_addr, "5dzFvraZ7lZUAlQu")).
 
 -endif. %% TEST
