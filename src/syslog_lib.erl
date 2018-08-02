@@ -373,17 +373,24 @@ to_type(Type, V) when is_integer(V) ->
 to_type(Type, V) when is_binary(V) ->
     to_type(Type, binary_to_list(V)).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 to_ip_addr_type(V) ->
-    handle_inet_parse_address(inet:parse_address(V), V).
+    case inet:parse_address(V) of
+        {error, einval} -> try_inet_getaddr(V, [inet, inet6]);
+        {ok, IpAddr}    -> IpAddr
+    end.
 
-handle_inet_parse_address({error, einval}, V) ->
-    try_inet_getaddr(V, [inet, inet6]);
-handle_inet_parse_address({ok, IpAddr}, _V) ->
-    IpAddr.
-
-try_inet_getaddr(V, [AddrFamily|Rest]) ->
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+try_inet_getaddr(V, [AddrFamily | Rest]) ->
     handle_inet_getaddr(inet:getaddr(V, AddrFamily), V, Rest).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 handle_inet_getaddr(_, _, []) ->
     error(invalid_dest_host);
 handle_inet_getaddr({error, _}, V, AddrFamilies) ->
