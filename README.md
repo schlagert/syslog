@@ -340,7 +340,10 @@ History
   `logger` API. But be aware that this is only a hack involving the start of the
   legacy `error_logger`. If you want to use this, *do not forget* to set the
   `kernel` environment variable `logger_sasl_compatible` to `true` in your
-  release. Unfortunately, the unit tests don't work with OTP 21.
+  release. Unfortunately, the unit tests don't work with OTP 21. Proper support
+  for OTP 21 will be a topic for version 4.
+* Add support for hostnames as values for the `dest_host` configuration
+  (thanks to @lukebakken)
 
 ### 3.4.2
 
