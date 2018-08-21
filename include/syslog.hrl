@@ -24,7 +24,6 @@
 
 -record(syslog_cfg, {
           hostname :: string(),
-          domain   :: string(),
           appname  :: binary(),
           beam_pid :: binary(),
           bom      :: binary()}).

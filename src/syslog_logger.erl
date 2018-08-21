@@ -38,7 +38,9 @@
 %% API
 -export([start_link/0,
          log/6,
+         log/7,
          async_log/6,
+         async_log/7,
          set_log_level/1,
          set_log_mode/1]).
 
@@ -60,6 +62,7 @@
 -define(TRANSPORT, udp).
 -define(TIMEOUT, 1000).
 -define(MULTILINE, false).
+-define(HOSTNAME_TRANSFORM, none).
 
 -define(SEPARATORS, [<<"\n">>, <<"\r">>]).
 -define(TCP_OPTS, [{keepalive, true},
@@ -79,6 +82,11 @@
 %%%=============================================================================
 %%% Callback Definitions (the behaviour implemented by protocol backends)
 %%%=============================================================================
+
+-callback normalise_hostname(string()) -> string().
+%% @doc
+%% Value of hostname normalised for use by this protocol.
+%% @end
 
 -callback hdr(syslog:datetime(), binary(), #syslog_cfg{}) -> iodata().
 %% @doc
@@ -122,6 +130,23 @@ log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Forwards a message. This function never fails. Allows overriding of
+%% config options.
+%% @end
+%%------------------------------------------------------------------------------
+-spec log(syslog:severity(),
+          syslog:proc_name(),
+          erlang:timestamp(),
+          [syslog:sd_element()],
+          io:format() | iolist(),
+          [term()] | no_format,
+          proplists:proplist()) -> ok.
+log(Severity, Pid, Timestamp, SD, Fmt, Args, Overrides) ->
+    Opts = apply_cfg_overrides(get_opts(), Overrides),
+    maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, Opts).
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Forwards a message asynchronously. This function never fails.
 %% @end
 %%------------------------------------------------------------------------------
@@ -134,6 +159,24 @@ log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
 async_log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
     AsyncOpts = (get_opts())#opts{function = get_function(true)},
     maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, AsyncOpts).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Forwards a message asynchronously. This function never fails. Allows
+%% overriding of config options.
+%% @end
+%%------------------------------------------------------------------------------
+-spec async_log(syslog:severity(),
+                syslog:proc_name(),
+                erlang:timestamp(),
+                [syslog:sd_element()],
+                io:format() | iolist(),
+                [term()] | no_format,
+                proplists:proplist()) -> ok.
+async_log(Severity, Pid, Timestamp, SD, Fmt, Args, Overrides) ->
+    AsyncOpts = (get_opts())#opts{function = get_function(true)},
+    NewAsyncOpts = apply_cfg_overrides(AsyncOpts, Overrides),
+    maybe_log(Severity, Pid, Timestamp, SD, Fmt, Args, NewAsyncOpts).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -407,22 +450,23 @@ forward(_Msg, Binary, #opts{function = cast}) ->
 %% @private
 %%------------------------------------------------------------------------------
 new_opts(Level, Protocol) ->
+    ProtocolModule = get_protocol(Protocol),
     #opts{
        function = get_function(syslog_lib:get_property(async, ?ASYNC)),
        log_level = map_severity(Level),
-       protocol = get_protocol(Protocol),
+       protocol = ProtocolModule,
        facility = syslog_lib:get_property(facility, ?FACILITY),
        crash_facility = syslog_lib:get_property(crash_facility, ?FACILITY),
        multiline = syslog_lib:get_property(multiline_mode, ?MULTILINE),
-       cfg = new_cfg()}.
+       cfg = new_cfg(ProtocolModule)}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-new_cfg() ->
+new_cfg(Protocol) ->
     #syslog_cfg{
-       hostname = syslog_lib:get_hostname(),
-       domain = syslog_lib:get_domain(),
+       hostname = Protocol:normalise_hostname(syslog_lib:get_hostname(
+          syslog_lib:get_property(hostname_transform, ?HOSTNAME_TRANSFORM))),
        appname = syslog_lib:get_name(),
        beam_pid = list_to_binary(os:getpid()),
        bom = get_bom()}.
@@ -529,5 +573,31 @@ get_function(false) -> {call, syslog_lib:get_property(timeout, ?TIMEOUT, integer
 %% @private
 %%------------------------------------------------------------------------------
 get_bom()           -> get_bom(syslog_lib:get_property(use_rfc5424_bom, false)).
-get_bom({ok, true}) -> unicode:encoding_to_bom(utf8);
+get_bom({ok, true}) -> get_bom(true);
+get_bom(true)       -> unicode:encoding_to_bom(utf8);
 get_bom(_)          -> <<>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Applying user provided overrides to the outgoing messages. This allows the
+%% user to change the default values for any of the syslog cfg values per
+%% message.
+%%
+%% Since these values are provided by the user they have to checked to sure
+%% they are in the correct format before sending.
+%%------------------------------------------------------------------------------
+apply_cfg_overrides(Opts = #opts{cfg = Cfg}, Overrides) ->
+    Opts#opts{cfg = apply_cfg_overrides(Cfg, Overrides)};
+apply_cfg_overrides(Cfg = #syslog_cfg{}, []) ->
+    Cfg;
+apply_cfg_overrides(Cfg = #syslog_cfg{}, [{hostname, HostName} | T])
+  when is_list(HostName) ->
+    apply_cfg_overrides(Cfg#syslog_cfg{hostname = HostName}, T);
+apply_cfg_overrides(Cfg = #syslog_cfg{}, [{appname, AppName} | T]) ->
+    AppName1 = syslog_lib:to_type(binary, AppName),
+    apply_cfg_overrides(Cfg#syslog_cfg{appname = AppName1}, T);
+apply_cfg_overrides(Cfg = #syslog_cfg{}, [{beam_pid, BeamPid} | T]) ->
+    BeamPid1 = syslog_lib:to_type(binary, BeamPid),
+    apply_cfg_overrides(Cfg#syslog_cfg{beam_pid=BeamPid1}, T);
+apply_cfg_overrides(Cfg = #syslog_cfg{}, [{bom, Bom} | T]) when is_boolean(Bom) ->
+    apply_cfg_overrides(Cfg#syslog_cfg{bom=get_bom(Bom)}, T).

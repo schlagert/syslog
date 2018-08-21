@@ -173,6 +173,18 @@ are available and can be configured in the application environment:
   multiline messages well, e.g. will insert garbage characters for a newline
   character. Default is `false`.
 
+* `{hostname_transform, none | short | long}`
+
+  Specifies how the hostname obtained from `node()` will be transformed for use
+  as the hostname in messages. If the setting is `none` the value will be used
+  as-is, if the setting is `short` any domain part of the name will be removed,
+  and if the setting is `long` then `syslog` will attempt to fully qualify the
+  name if no domain part is present. If the hostname obtained from `node()` is
+  an IP address then no transformation is applied. If the node is not alive then
+  the result of `inet:gethostname` will be used in place of `node()`. Note that
+  RFC 3164 requires that the domain is not included in the hostname, and will
+  remove the domain part from the resulting hostname. Default is `none`.
+
 If your application really needs fast asynchronous logging and you like to live
 dangerously, logging can be done either with the `error_logger` or the `syslog`
 API and the `syslog` application should be configured with `{async, true}` and
@@ -238,7 +250,9 @@ It can handle more complex options such as below
         {syslog_lager_backend, [
           debug,                                 %% Level
           {"sdata_id", [application, pid]},      %% STRUCTURED-DATA
-          {lager_default_formatter, [message]}   %% Lager formatting
+          {lager_default_formatter, [message]},  %% Lager formatting
+          true                                   %% Use application field from
+                                                 %% lager metadata for appname
         ]}
     ]}
 ]}.

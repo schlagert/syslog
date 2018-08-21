@@ -21,8 +21,7 @@
 -module(syslog_lib).
 
 %% API
--export([get_hostname/0,
-         get_domain/0,
+-export([get_hostname/1,
          get_name/0,
          get_property/2,
          get_property/3,
@@ -32,7 +31,8 @@
          truncate/2,
          format_rfc3164_date/1,
          format_rfc5424_date/1,
-         ensure_error_logger/0]).
+         ensure_error_logger/0,
+         to_type/2]).
 
 -define(GET_ENV(Property), application:get_env(syslog, Property)).
 
@@ -48,33 +48,34 @@
 %% qualified domain name. The hostname will usually be the host part of the
 %% node name, except for the cases when the node is not alive or some strange
 %% host part was set, e.g. something related to the loopback interface. In this
-%% case the hostname will be what `inet:gethostname/0` returns.
+%% case the hostname will be what `inet:gethostname/0` returns, optionally with
+%% the domain removed.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_hostname() -> string().
-get_hostname() ->
-    get_hostname(get_hostpart(node())).
-get_hostname(HostPart) ->
-    case lists:member(HostPart, ["nohost" | get_loopback_names()]) of
-        true  -> element(2, inet:gethostname());
-        false -> HostPart
-    end.
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Returns the domain name of the running node. If the node was started using
-%% short names or if an IP address was set as host part of the node name, the
-%% returned string may be empty.
-%% @end
-%%------------------------------------------------------------------------------
--spec get_domain() -> string().
-get_domain() ->
-    get_domain(get_hostname()).
-get_domain(Hostname) ->
-    case {is_ip4(Hostname), string:tokens(Hostname, ".")} of
-        {true, _}       -> "";
-        {_, [_]}        -> "";
-        {_, [_ | Rest]} -> string:join(Rest, ".")
+-spec get_hostname(none | short | long) -> string().
+get_hostname(Transform) when is_atom(Transform) ->
+    get_hostname(Transform, get_hostpart(node())).
+get_hostname(none, HostPart) when is_list(HostPart) ->
+    clean_hostpart(HostPart);
+get_hostname(short, HostPart) when is_list(HostPart) ->
+    CleanHostPart = clean_hostpart(HostPart),
+    case is_ip4(CleanHostPart) of
+        true  -> CleanHostPart;
+        false -> hd(string:tokens(CleanHostPart, "."))
+    end;
+get_hostname(long, HostPart) when is_list(HostPart) ->
+    CleanHostPart = clean_hostpart(HostPart),
+    case is_ip4(CleanHostPart) of
+        true  -> CleanHostPart;
+        false ->
+            case lists:member($., CleanHostPart) of
+                true  -> CleanHostPart;
+                false ->
+                    case inet:gethostbyname(CleanHostPart) of
+                        {ok, #hostent{h_name=Hostname}} -> Hostname;
+                        {error, _}                  -> CleanHostPart
+                    end
+            end
     end.
 
 %%------------------------------------------------------------------------------
@@ -218,6 +219,32 @@ ensure_error_logger() ->
                 #{level => info, filter_default => log}))
     end.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Convert variables from one type to another
+%% @end
+%%------------------------------------------------------------------------------
+to_type(binary, V) when is_binary(V) ->
+    V;
+to_type(binary, V) when is_list(V) ->
+    list_to_binary(V);
+to_type(binary, V) when is_atom(V) ->
+    atom_to_binary(V, utf8);
+to_type(integer, V) when is_integer(V) ->
+    V;
+to_type(integer, V) when is_list(V) ->
+    list_to_integer(V);
+to_type(ip_addr, V) when is_tuple(V) ->
+    V;
+to_type(ip_addr, V) when is_list(V) ->
+    to_ip_addr_type(V);
+to_type(Type, V) when is_pid(V) ->
+    to_type(Type, pid_to_list(V));
+to_type(Type, V) when is_integer(V) ->
+    to_type(Type, integer_to_list(V));
+to_type(Type, V) when is_binary(V) ->
+    to_type(Type, binary_to_list(V)).
+
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
@@ -237,7 +264,7 @@ wait_for_error_logger(Error) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_name_from_node(Node) ->
+get_name_from_node(Node) when is_atom(Node) ->
     case atom_to_binary(Node, utf8) of
         <<"nonode@nohost">> -> <<"beam">>;
         N                   -> hd(binary:split(N, <<"@">>))
@@ -245,9 +272,24 @@ get_name_from_node(Node) ->
 
 %%------------------------------------------------------------------------------
 %% @private
+%% Return the host part of the node name
 %%------------------------------------------------------------------------------
-get_hostpart(Node) ->
-    hd(lists:reverse(string:tokens(atom_to_list(Node), "@"))).
+get_hostpart(Node) when is_atom(Node) ->
+    lists:last(string:tokens(atom_to_list(Node), "@")).
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Check for cases when the node is not alive or some strange host part was set,
+%% e.g. something related to the loopback interface and replace host part
+%% with the result of `inet:gethostname/0`
+%%------------------------------------------------------------------------------
+clean_hostpart("nohost") ->
+    element(2, inet:gethostname());
+clean_hostpart(HostPart) when is_list(HostPart) ->
+    case lists:member(HostPart, get_loopback_names()) of
+        true  -> element(2, inet:gethostname());
+        false -> HostPart
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -284,7 +326,8 @@ ntoa(IPv4) -> lists:flatten(io_lib:format("~w.~w.~w.~w", tuple_to_list(IPv4))).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-is_ip4(Str) -> re:run(Str, "\\d+.\\d+.\\d+.\\d+", [{capture, none}]) =:= match.
+is_ip4(Str) ->
+  re:run(Str, "\\A\\d+\\.\\d+\\.\\d+\\.\\d+\\Z", [{capture, none}]) =:= match.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -352,30 +395,6 @@ micro(M)                 -> integer_to_list(M).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-to_type(binary, V) when is_binary(V) ->
-    V;
-to_type(binary, V) when is_list(V) ->
-    list_to_binary(V);
-to_type(binary, V) when is_atom(V) ->
-    atom_to_binary(V, utf8);
-to_type(integer, V) when is_integer(V) ->
-    V;
-to_type(integer, V) when is_list(V) ->
-    list_to_integer(V);
-to_type(ip_addr, V) when is_tuple(V) ->
-    V;
-to_type(ip_addr, V) when is_list(V) ->
-    to_ip_addr_type(V);
-to_type(Type, V) when is_pid(V) ->
-    to_type(Type, pid_to_list(V));
-to_type(Type, V) when is_integer(V) ->
-    to_type(Type, integer_to_list(V));
-to_type(Type, V) when is_binary(V) ->
-    to_type(Type, binary_to_list(V)).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 to_ip_addr_type(V) ->
     case inet:parse_address(V) of
         {error, einval} -> try_inet_getaddr(V, [inet, inet6]);
@@ -406,19 +425,46 @@ handle_inet_getaddr({ok, IpAddr}, _, _) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-get_hostname_test() ->
-    {ok, InetReturn} = inet:gethostname(),
-    ?assertEqual(InetReturn,        get_hostname("nohost")),
-    ?assertEqual(InetReturn,        get_hostname("127.0.0.1")),
-    ?assertEqual(InetReturn,        get_hostname("localhost")),
-    ?assertEqual("hostname",        get_hostname("hostname")),
-    ?assertEqual("hostname.domain", get_hostname("hostname.domain")).
+get_hostname_ip_test() ->
+    ?assertEqual("192.168.1.1", get_hostname(none,  "192.168.1.1")),
+    ?assertEqual("192.168.1.1", get_hostname(short, "192.168.1.1")),
+    ?assertEqual("192.168.1.1", get_hostname(long,  "192.168.1.1")).
 
-get_domain_test() ->
-    ?assertEqual("",          get_domain("host")),
-    ?assertEqual("",          get_domain("127.0.0.1")),
-    ?assertEqual("domain",    get_domain("host.domain")),
-    ?assertEqual("domain.de", get_domain("host.domain.de")).
+get_hostname_none_test() ->
+    {ok, Hostname} = inet:gethostname(),
+    {ok, #hostent{h_name=Localhost}} = inet:gethostbyaddr("127.0.0.1"),
+    ?assertEqual(Hostname,          get_hostname(none, "nohost")),
+    ?assertEqual(Hostname,          get_hostname(none, "127.0.0.1")),
+    ?assertEqual(Hostname,          get_hostname(none, Localhost)),
+    ?assertEqual("hostname",        get_hostname(none, "hostname")),
+    ?assertEqual("hostname.domain", get_hostname(none, "hostname.domain")).
+
+get_hostname_short_test() ->
+    {ok, Hostname} = inet:gethostname(),
+    HostnameShort = hd(string:tokens(Hostname, ".")),
+    {ok, #hostent{h_name=Localhost}} = inet:gethostbyaddr("127.0.0.1"),
+    ?assertEqual(HostnameShort, get_hostname(short, "nohost")),
+    ?assertEqual(HostnameShort, get_hostname(short, "127.0.0.1")),
+    ?assertEqual(HostnameShort, get_hostname(short, Localhost)),
+    ?assertEqual("hostname",    get_hostname(short, "hostname")),
+    ?assertEqual("hostname",    get_hostname(short, "hostname.domain")).
+
+get_hostname_long_test() ->
+    {ok, Hostname} = inet:gethostname(),
+    HostnameLong1 = case inet:gethostbyname(Hostname) of
+        {ok, #hostent{h_name=Hname1}} -> Hname1;
+        {error, _}                    -> Hostname
+    end,
+    HostnameLong2 = case inet:gethostbyname("hostname") of
+        {ok, #hostent{h_name=Hname2}} -> Hname2;
+        {error, _}                    -> "hostname"
+    end,
+    {ok, #hostent{h_name=Localhost}} = inet:gethostbyaddr("127.0.0.1"),
+    ?assertEqual(HostnameLong1,     get_hostname(long, "nohost")),
+    ?assertEqual(HostnameLong1,     get_hostname(long, "127.0.0.1")),
+    ?assertEqual(HostnameLong1,     get_hostname(long, Localhost)),
+    ?assertEqual(HostnameLong2,     get_hostname(long, "hostname")),
+    ?assertEqual("hostname.domain", get_hostname(long, "hostname.domain")).
 
 get_name_from_node_test() ->
     ?assertEqual(<<"beam">>,     get_name_from_node('nonode@nohost')),
@@ -449,16 +495,17 @@ truncate_test() ->
 format_rfc3164_date_test() ->
     Datetime = {{{2013,4,6},{21,20,56}},908235},
     Date = format_rfc3164_date(Datetime),
-    Rx = "Apr  6 \\d\\d:20:56",
+    Rx = "Apr  [67] \\d\\d:20:56",
     ?assertMatch({match, _}, re:run(lists:flatten(Date), Rx)).
 
 format_rfc5424_date_test() ->
     Datetime = {{{2013,4,6},{21,20,56}},908235},
     Date = format_rfc5424_date(Datetime),
-    Rx = "2013-04-06T\\d\\d:\\d\\d:56\\.908235(Z|(\\+|-)\\d\\d:\\d\\d)",
+    Rx = "2013-04-0[67]T\\d\\d:\\d\\d:56\\.908235(Z|(\\+|-)\\d\\d:\\d\\d)",
     ?assertMatch({match, _}, re:run(lists:flatten(Date), Rx)).
 
 to_type_test() ->
+    {ok, #hostent{h_name=Localhost}} = inet:gethostbyaddr("127.0.0.1"),
     ?assertEqual(<<"1">>, to_type(binary, <<"1">>)),
     ?assertEqual(<<"1">>, to_type(binary, "1")),
     ?assertEqual(<<"1">>, to_type(binary, 1)),
@@ -467,8 +514,8 @@ to_type_test() ->
     ?assertEqual(1, to_type(integer, <<"1">>)),
     ?assertEqual(1, to_type(integer, "1")),
     ?assertEqual(1, to_type(integer, 1)),
-    ?assertEqual({127,0,0,1}, to_type(ip_addr, "localhost")),
-    ?assertEqual({127,0,0,1}, to_type(ip_addr, <<"localhost">>)),
+    ?assertEqual({127,0,0,1}, to_type(ip_addr, Localhost)),
+    ?assertEqual({127,0,0,1}, to_type(ip_addr, list_to_binary(Localhost))),
     ?assertEqual({127,0,0,1}, to_type(ip_addr, <<"127.0.0.1">>)),
     ?assertEqual({127,0,0,1}, to_type(ip_addr, "127.0.0.1")),
     ?assertEqual({0,0,0,0,0,0,0,1}, to_type(ip_addr, "::1")),
