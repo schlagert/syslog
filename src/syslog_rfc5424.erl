@@ -23,7 +23,7 @@
 -behaviour(syslog_logger).
 
 %% API
--export([normalise_hostname/1, hdr/3, msg/3]).
+-export([hostname/1, hdr/3, msg/3]).
 
 -include("syslog.hrl").
 
@@ -38,8 +38,8 @@
 %% FQDN, IP address, hostname all allowed by RFC 5424
 %% @end
 %%------------------------------------------------------------------------------
--spec normalise_hostname(string()) -> string().
-normalise_hostname(Hostname) when is_list(Hostname) -> Hostname.
+-spec hostname(string()) -> string().
+hostname(Hostname) when is_list(Hostname) -> Hostname.
 
 %%------------------------------------------------------------------------------
 %% @doc

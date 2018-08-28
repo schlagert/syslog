@@ -22,7 +22,7 @@
 -behaviour(syslog_logger).
 
 %% API
--export([normalise_hostname/1, hdr/3, msg/3]).
+-export([hostname/1, hdr/3, msg/3]).
 
 -include("syslog.hrl").
 
@@ -35,9 +35,8 @@
 %% RFC 3164: The Domain Name MUST NOT be included in the HOSTNAME field.
 %% @end
 %%------------------------------------------------------------------------------
--spec normalise_hostname(string()) -> string().
-normalise_hostname(Hostname) when is_list(Hostname) ->
-    hd(string:tokens(Hostname, ".")).
+-spec hostname(string()) -> string().
+hostname(Hostname) when is_list(Hostname) -> hd(string:tokens(Hostname, ".")).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -45,8 +44,7 @@ normalise_hostname(Hostname) when is_list(Hostname) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec hdr(syslog:datetime(), binary(), #syslog_cfg{}) -> iodata().
-hdr(
-  Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
+hdr(Datetime, Pid, #syslog_cfg{hostname = H, appname = A, beam_pid = B}) ->
     [
      syslog_lib:format_rfc3164_date(Datetime), $\s,
      H, $\s,

@@ -67,12 +67,12 @@ set_log_level(Level) ->
 %%%=============================================================================
 
 -record(state, {
-    log_level       :: integer() | {mask, integer()},
-    formatter       :: atom(),
-    format_cfg      :: list(),
-    sd_id           :: string() | undefined,
-    metadata_keys   :: [atom()],
-    use_msg_appname :: boolean()}).
+          log_level       :: integer() | {mask, integer()},
+          formatter       :: atom(),
+          format_cfg      :: list(),
+          sd_id           :: string() | undefined,
+          metadata_keys   :: [atom()],
+          use_msg_appname :: boolean()}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -85,7 +85,7 @@ init([Level, {}, {Formatter, FormatterConfig}]) when is_atom(Formatter) ->
     init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
 init([Level, SData, {Formatter, FormatterConfig}])
   when is_atom(Formatter) ->
-     init([Level, SData, {Formatter, FormatterConfig}, false]);
+    init([Level, SData, {Formatter, FormatterConfig}, false]);
 init([Level, {}, {Formatter, FormatterConfig}, UseMsgAppName])
   when is_atom(Formatter) ->
     init([Level, {undefined, []}, {Formatter, FormatterConfig}, UseMsgAppName]);
@@ -112,14 +112,13 @@ handle_event({log, Level, _, [_, Location, Message]}, State)
 handle_event({log, Msg}, State = #state{log_level = Level}) ->
     case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
         true ->
-            Severity = get_severity(Msg),
-            Pid = get_pid(Msg),
-            Timestamp = apply(lager_msg, timestamp, [Msg]),
-            Message = format_msg(Msg, State),
-            SD = metadata_to_sd(Msg, State),
-            Overrides = get_appname_override(Msg, State),
-            syslog_logger:log(
-              Severity, Pid, Timestamp, SD, Message, no_format, Overrides);
+            syslog_logger:log(get_severity(Msg),
+                              get_pid(Msg),
+                              apply(lager_msg, timestamp, [Msg]),
+                              metadata_to_sd(Msg, State),
+                              format_msg(Msg, State),
+                              no_format,
+                              get_appname_override(Msg, State));
         false ->
             ok
     end,
@@ -223,13 +222,13 @@ metadata_to_sd(Msg, #state{sd_id = SDataId, metadata_keys = MDKeys}) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_appname_override(_, #state{use_msg_appname = false}) ->
-  [];
+    [];
 get_appname_override(Msg, #state{use_msg_appname = true}) ->
     try apply(lager_msg, metadata, [Msg]) of
         Metadata ->
             case proplists:get_value(application, Metadata) of
                 undefined -> [];
-                Result -> [{appname, Result}]
+                Result    -> [{appname, Result}]
             end
     catch
         _:_ -> []

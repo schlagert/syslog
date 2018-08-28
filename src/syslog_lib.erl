@@ -73,7 +73,7 @@ get_hostname(long, HostPart) when is_list(HostPart) ->
                 false ->
                     case inet:gethostbyname(CleanHostPart) of
                         {ok, #hostent{h_name=Hostname}} -> Hostname;
-                        {error, _}                  -> CleanHostPart
+                        {error, _}                      -> CleanHostPart
                     end
             end
     end.
@@ -224,26 +224,16 @@ ensure_error_logger() ->
 %% Convert variables from one type to another
 %% @end
 %%------------------------------------------------------------------------------
-to_type(binary, V) when is_binary(V) ->
-    V;
-to_type(binary, V) when is_list(V) ->
-    list_to_binary(V);
-to_type(binary, V) when is_atom(V) ->
-    atom_to_binary(V, utf8);
-to_type(integer, V) when is_integer(V) ->
-    V;
-to_type(integer, V) when is_list(V) ->
-    list_to_integer(V);
-to_type(ip_addr, V) when is_tuple(V) ->
-    V;
-to_type(ip_addr, V) when is_list(V) ->
-    to_ip_addr_type(V);
-to_type(Type, V) when is_pid(V) ->
-    to_type(Type, pid_to_list(V));
-to_type(Type, V) when is_integer(V) ->
-    to_type(Type, integer_to_list(V));
-to_type(Type, V) when is_binary(V) ->
-    to_type(Type, binary_to_list(V)).
+to_type(binary, V) when is_binary(V)   -> V;
+to_type(binary, V) when is_list(V)     -> list_to_binary(V);
+to_type(binary, V) when is_atom(V)     -> atom_to_binary(V, utf8);
+to_type(integer, V) when is_integer(V) -> V;
+to_type(integer, V) when is_list(V)    -> list_to_integer(V);
+to_type(ip_addr, V) when is_tuple(V)   -> V;
+to_type(ip_addr, V) when is_list(V)    -> to_ip_addr_type(V);
+to_type(Type, V) when is_pid(V)        -> to_type(Type, pid_to_list(V));
+to_type(Type, V) when is_integer(V)    -> to_type(Type, integer_to_list(V));
+to_type(Type, V) when is_binary(V)     -> to_type(Type, binary_to_list(V)).
 
 %%%=============================================================================
 %%% internal functions

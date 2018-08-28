@@ -59,10 +59,10 @@
 -define(DEST_PORT, 514).
 -define(FACILITY, ?SYSLOG_FACILITY).
 -define(PROTOCOL, rfc3164).
+-define(TRANSFORM, none).
 -define(TRANSPORT, udp).
 -define(TIMEOUT, 1000).
 -define(MULTILINE, false).
--define(HOSTNAME_TRANSFORM, none).
 
 -define(SEPARATORS, [<<"\n">>, <<"\r">>]).
 -define(TCP_OPTS, [{keepalive, true},
@@ -83,7 +83,7 @@
 %%% Callback Definitions (the behaviour implemented by protocol backends)
 %%%=============================================================================
 
--callback normalise_hostname(string()) -> string().
+-callback hostname(string()) -> string().
 %% @doc
 %% Value of hostname normalised for use by this protocol.
 %% @end
@@ -464,9 +464,9 @@ new_opts(Level, Protocol) ->
 %% @private
 %%------------------------------------------------------------------------------
 new_cfg(Protocol) ->
+    Transform = syslog_lib:get_property(hostname_transform, ?TRANSFORM),
     #syslog_cfg{
-       hostname = Protocol:normalise_hostname(syslog_lib:get_hostname(
-          syslog_lib:get_property(hostname_transform, ?HOSTNAME_TRANSFORM))),
+       hostname = Protocol:hostname(syslog_lib:get_hostname(Transform)),
        appname = syslog_lib:get_name(),
        beam_pid = list_to_binary(os:getpid()),
        bom = get_bom()}.
@@ -598,6 +598,7 @@ apply_cfg_overrides(Cfg = #syslog_cfg{}, [{appname, AppName} | T]) ->
     apply_cfg_overrides(Cfg#syslog_cfg{appname = AppName1}, T);
 apply_cfg_overrides(Cfg = #syslog_cfg{}, [{beam_pid, BeamPid} | T]) ->
     BeamPid1 = syslog_lib:to_type(binary, BeamPid),
-    apply_cfg_overrides(Cfg#syslog_cfg{beam_pid=BeamPid1}, T);
-apply_cfg_overrides(Cfg = #syslog_cfg{}, [{bom, Bom} | T]) when is_boolean(Bom) ->
-    apply_cfg_overrides(Cfg#syslog_cfg{bom=get_bom(Bom)}, T).
+    apply_cfg_overrides(Cfg#syslog_cfg{beam_pid = BeamPid1}, T);
+apply_cfg_overrides(Cfg = #syslog_cfg{}, [{bom, Bom} | T])
+  when is_boolean(Bom) ->
+    apply_cfg_overrides(Cfg#syslog_cfg{bom = get_bom(Bom)}, T).
