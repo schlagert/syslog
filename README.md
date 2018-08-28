@@ -348,7 +348,8 @@ History
 
 ### Master (3.4.4)
 
-No changes to latest tag
+* Allow message header customizations, e.g. `APP-NAME` and/or `HOSTNAME` (thanks
+  to @GlenWalker)
 
 ### 3.4.3
 
