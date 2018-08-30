@@ -186,9 +186,8 @@ are available and can be configured in the application environment:
   remove the domain part from the resulting hostname. Default is `none`.
 
 If your application really needs fast asynchronous logging and you like to live
-dangerously, logging can be done either with the `error_logger` or the `syslog`
-API and the `syslog` application should be configured with `{async, true}` and
-`{msg_queue_limit, infinity}`. This sets `syslog` into asynchronous delivery
+dangerously, the `syslog` application should be configured with `{async, true}`
+and `{msg_queue_limit, infinity}`. This sets `syslog` into asynchronous delivery
 mode and all message queues are allowed to grow indefinitely.
 
 The `syslog` application will disable the standard `error_logger` TTY output on
@@ -341,12 +340,10 @@ probably, copying the large terms makes the logging processes slow enough that
 from growing too much. However, it could be observed again that some senders
 were blocked over 10 seconds.
 
-TODO more details?
-
 History
 -------
 
-### Master (3.4.4)
+### 3.4.4
 
 * Allow message header customizations, e.g. `APP-NAME` and/or `HOSTNAME` (thanks
   to @GlenWalker)
