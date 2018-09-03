@@ -200,7 +200,11 @@ msg(Severity, Pid, SD, Fmt, Args) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Change the log level to the given value.
+%% Change the log level to the given value. This function will also attempt to
+%% set the log level of the available {@link syslog_lager_backend}s, if any.
+%%
+%% This function will not change the level of `logger' handlers (OTP 21). To
+%% change the log level in OTP 21 and above, use the official `logger' API.
 %% @end
 %%------------------------------------------------------------------------------
 -spec set_log_level(severity()) -> ok | {error, term()}.
