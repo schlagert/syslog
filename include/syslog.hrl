@@ -54,5 +54,6 @@
 
 -define(SYSLOG_FACILITY, daemon).
 -define(SYSLOG_LOGLEVEL, debug).
+-define(SYSLOG_NO_PROGRESS, false).
 
 -endif. %% syslog_hrl_

@@ -218,15 +218,22 @@ level_to_severity(Level) when is_atom(Level) -> Level.
 %% Ensures the necessary configuration mappings.
 %%------------------------------------------------------------------------------
 verify_cfg(Cfg) when is_map(Cfg) ->
-    Facility = syslog_lib:get_property(facility, ?SYSLOG_FACILITY),
-    CrashFacility = syslog_lib:get_property(crash_facility, ?SYSLOG_FACILITY),
-    ExtraReport = Facility =/= CrashFacility,
     HandlerCfg0 = maps_get(config, Cfg, #{}),
     HandlerCfg1 = maps_put_if_not_present(sd_id, undefined, HandlerCfg0),
     HandlerCfg2 = maps_put_if_not_present(meta_keys, [], HandlerCfg1),
+    Facility = syslog_lib:get_property(facility, ?SYSLOG_FACILITY),
+    CrashFacility = syslog_lib:get_property(crash_facility, ?SYSLOG_FACILITY),
+    ExtraReport = Facility =/= CrashFacility,
     HandlerCfg3 = maps:put(extra_report, ExtraReport, HandlerCfg2),
+    Cfg1 = maps:put(config, HandlerCfg3, Cfg),
+
+    NoProgress = syslog_lib:get_property(no_progress, ?SYSLOG_NO_PROGRESS),
+    ProgressAction = case NoProgress of true -> stop; false -> log end,
+    Filters = [{progress, {fun logger_filters:progress/2, ProgressAction}}],
+    Cfg2 = maps_put_if_not_present(filters, Filters, Cfg1),
+
     Formatter = syslog_lib:get_property(formatter, ?FORMATTER),
-    {ok, Cfg#{config => HandlerCfg3, formatter => Formatter}};
+    {ok, maps:put(formatter, Formatter, Cfg2)};
 verify_cfg(Cfg) ->
     {error, {invalid_config, Cfg}}.
 

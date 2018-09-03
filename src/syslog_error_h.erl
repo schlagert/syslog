@@ -38,7 +38,6 @@
 
 -define(PERCENTAGE, 10).
 -define(LIMIT, infinity).
--define(NO_PROGRESS, false).
 -define(VERBOSITY, true).
 
 %% ** Generic server ... terminating
@@ -74,7 +73,7 @@ init(_Arg) ->
             %% group_leader of all group_leaders and thus kind of static, we'll
             %% use that to determine the supported system encoding.
             init_pid        = whereis(init),
-            no_progress     = syslog_lib:get_property(no_progress, ?NO_PROGRESS),
+            no_progress     = syslog_lib:get_property(no_progress, ?SYSLOG_NO_PROGRESS),
             verbose         = syslog_lib:get_property(verbose, ?VERBOSITY),
             msg_queue_limit = syslog_lib:get_property(msg_queue_limit, ?LIMIT),
             drop_percentage = syslog_lib:get_property(drop_percentage, ?PERCENTAGE),

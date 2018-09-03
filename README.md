@@ -134,7 +134,7 @@ are available and can be configured in the application environment:
 
 * `{app_name, atom() | string() | binary()}`
 
-  Configured the value reported in the `APP-NAME` field of Syslog messages. If
+  Configures the value reported in the `APP-NAME` field of Syslog messages. If
   not set (the default), the name part of the node name will be used. If the
   node is not alive (not running in distributed mode) the string `beam` will be
   used.
