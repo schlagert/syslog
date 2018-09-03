@@ -20,10 +20,6 @@
 %%%   {handlers, [{syslog_lager_backend, []}]},
 %%% </pre>
 %%%
-%%% Note:
-%%% This modules uses apply/3 to call lager-specific functions in order to
-%%% prevent dialyzer from complaining when lager is not in path.
-%%%
 %%% @see https://github.com/basho/lager
 %%% @end
 %%%=============================================================================
@@ -46,6 +42,9 @@
 
 -define(CFG, [message]).
 
+%% avoid warnings when lager is not a project dependency
+-dialyzer(no_missing_calls).
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -59,7 +58,7 @@
 set_log_level(informational) ->
     set_log_level(info);
 set_log_level(Level) ->
-    catch apply(lager, set_loglevel, [?MODULE, Level]),
+    catch lager:set_loglevel(?MODULE, Level),
     ok.
 
 %%%=============================================================================
@@ -110,11 +109,11 @@ handle_event({log, Level, _, [_, Location, Message]}, State)
     syslog_logger:log(Severity, Pid, Timestamp, [], Message, no_format),
     {ok, State};
 handle_event({log, Msg}, State = #state{log_level = Level}) ->
-    case apply(lager_util, is_loggable, [Msg, Level, ?MODULE]) of
+    case lager_util:is_loggable(Msg, Level, ?MODULE) of
         true ->
             syslog_logger:log(get_severity(Msg),
                               get_pid(Msg),
-                              apply(lager_msg, timestamp, [Msg]),
+                              lager_msg:timestamp(Msg),
                               get_structured_data(Msg, State),
                               format_msg(Msg, State),
                               no_format,
@@ -167,9 +166,9 @@ get_severity(info) ->
 get_severity(Level) when is_atom(Level) ->
     Level;
 get_severity(Level) when is_integer(Level) ->
-    get_severity(apply(lager_util, num_to_level, [Level]));
+    get_severity(lager_util:num_to_level(Level));
 get_severity(Msg) ->
-    get_severity(apply(lager_msg, severity, [Msg])).
+    get_severity(lager_msg:severity(Msg)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -177,7 +176,7 @@ get_severity(Msg) ->
 get_pid(Location) when is_list(Location) ->
     Location;
 get_pid(Msg) ->
-    try apply(lager_msg, metadata, [Msg]) of
+    try lager_msg:metadata(Msg) of
         Metadata ->
             case lists:keyfind(pid, 1, Metadata) of
                 {pid, Pid} when is_pid(Pid)    -> Pid;
@@ -195,9 +194,9 @@ level_to_mask(informational) ->
     level_to_mask(info);
 level_to_mask(Level) ->
     try
-        apply(lager_util, config_to_mask, [Level])
+        lager_util:config_to_mask(Level)
     catch
-        error:undef -> apply(lager_util, level_to_num, [Level])
+        error:undef -> lager_util:level_to_num(Level)
     end.
 
 %%------------------------------------------------------------------------------
@@ -208,7 +207,7 @@ get_structured_data(_Msg, #state{sd_id = undefined}) ->
 get_structured_data(_Msg, #state{metadata_keys = []}) ->
     [];
 get_structured_data(Msg, #state{sd_id = SDId, metadata_keys = MDKeys}) ->
-    try apply(lager_msg, metadata, [Msg]) of
+    try lager_msg:metadata(Msg) of
         Metadata -> syslog_lib:get_structured_data(Metadata, SDId, MDKeys)
     catch
         _:_ -> []
@@ -220,7 +219,7 @@ get_structured_data(Msg, #state{sd_id = SDId, metadata_keys = MDKeys}) ->
 get_appname_override(_, #state{use_msg_appname = false}) ->
     [];
 get_appname_override(Msg, #state{use_msg_appname = true}) ->
-    try apply(lager_msg, metadata, [Msg]) of
+    try lager_msg:metadata(Msg) of
         Metadata ->
             case proplists:get_value(application, Metadata) of
                 undefined -> [];
@@ -234,4 +233,4 @@ get_appname_override(Msg, #state{use_msg_appname = true}) ->
 %% @private
 %%------------------------------------------------------------------------------
 format_msg(Msg, #state{formatter = Formatter, format_cfg = FormatterConfig}) ->
-    apply(Formatter, format, [Msg, FormatterConfig]).
+    Formatter:format(Msg, FormatterConfig).

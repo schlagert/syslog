@@ -39,6 +39,9 @@
 
 -include_lib("kernel/include/inet.hrl").
 
+%% calendar:system_time_to_universal_time/2
+-dialyzer({no_missing_calls, get_utc_datetime/1}).
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
