@@ -37,7 +37,6 @@
 -include("syslog.hrl").
 
 -define(PERCENTAGE, 10).
--define(FACILITY, ?SYSLOG_FACILITY).
 -define(LIMIT, infinity).
 -define(NO_PROGRESS, false).
 -define(VERBOSITY, true).
@@ -67,8 +66,8 @@
 %% @private
 %%------------------------------------------------------------------------------
 init(_Arg) ->
-    Facility = syslog_lib:get_property(facility, ?FACILITY),
-    CrashFacility = syslog_lib:get_property(crash_facility, ?FACILITY),
+    Facility = syslog_lib:get_property(facility, ?SYSLOG_FACILITY),
+    CrashFacility = syslog_lib:get_property(crash_facility, ?SYSLOG_FACILITY),
     {ok, #state{
             %% Starting with OTP 20.1 one does need a valid group_leader to call
             %% sasl_format:format_report/3. Since init (<0.0.0>) is the

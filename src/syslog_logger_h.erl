@@ -139,18 +139,59 @@ is_my_handler(HandlerId) ->
 %%------------------------------------------------------------------------------
 log_impl(LogEvent = #{level := Level, msg := Msg, meta := Metadata},
          #{formatter := {Fmt, FmtCfg}, config := HandlerCfg}) ->
-    syslog_logger:log(level_to_severity(Level),
-                      maps_get(pid, Metadata, self()),
-                      maps_get(time, Metadata, os:timestamp()),
-                      structured_data(Msg, Metadata, HandlerCfg),
-                      Fmt:format(LogEvent, FmtCfg),
-                      no_format).
+    Pid = maps_get(pid, Metadata, self()),
+    Time = maps_get(time, Metadata, os:timestamp()),
+    SD = structured_data(Msg, Metadata, HandlerCfg),
+    LogMsg = Fmt:format(LogEvent, FmtCfg),
+    case {maps:find(extra_report, HandlerCfg), Level, Msg} of
+        {{ok, true}, error, {report, #{label := {supervisor, _}}}} ->
+            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format);
+        {{ok, true}, error, {report, #{label := {_, terminate}}}} ->
+            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format);
+        {{ok, true}, error, {report, Report = #{label := {_, crash}}}} ->
+            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format),
+            case maps_get(report, Report, []) of
+                [ProcEnv | _] when is_list(ProcEnv) ->
+                    ErrorInfo = proplists:get_value(error_info, ProcEnv),
+                    log_extra_report(Pid, Time, ErrorInfo);
+                _ ->
+                    ok
+            end;
+        _ ->
+            Severity = level_to_severity(Level),
+            syslog_logger:log(Severity, Pid, Time, SD, LogMsg, no_format)
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-level_to_severity(info)                      -> informational;
-level_to_severity(Level) when is_atom(Level) -> Level.
+log_extra_report(Pid, Time, {Class, Reason, [{M, F, Args, Ps} | _]})
+  when is_list(Args) ->
+    As = lists:join($,, [io_lib:format("~w", [A]) || A <- Args]),
+    Fmt = "exited with ~w at ~s:~s(~s)~s",
+    Args = [{Class, Reason}, M, F, As, get_line(Ps)],
+    syslog_logger:log(error, Pid, Time, [], Fmt, Args);
+log_extra_report(Pid, Time, {Class, Reason, [{M, F, Arity, Ps} | _]})
+  when is_integer(Arity) ->
+    Fmt = "exited with ~w at ~s:~s/~w~s",
+    Args = [{Class, Reason}, M, F, Arity, get_line(Ps)],
+    syslog_logger:log(error, Pid, Time, [], Fmt, Args);
+log_extra_report(Pid, Time, {Class, Reason, _}) ->
+    Args = [{Class, Reason}],
+    syslog_logger:log(error, Pid, Time, [], "exited with ~w", Args);
+log_extra_report(Pid, Time, {Class, {Reason, Stack}}) when is_list(Stack) ->
+    log_extra_report(Pid, Time, {Class, Reason, Stack});
+log_extra_report(Pid, Time, Reason) ->
+    syslog_logger:log(error, Pid, Time, [], "exited with ~w", [Reason]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_line(Proplist) ->
+    case proplists:get_value(line, Proplist) of
+        L when is_integer(L) -> [" line ", integer_to_list(L)];
+        undefined            -> ""
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -168,14 +209,24 @@ structured_data(_, Metadata, #{sd_id := SDId, meta_keys := MDKeys}) ->
 
 %%------------------------------------------------------------------------------
 %% @private
+%%------------------------------------------------------------------------------
+level_to_severity(info)                      -> informational;
+level_to_severity(Level) when is_atom(Level) -> Level.
+
+%%------------------------------------------------------------------------------
+%% @private
 %% Ensures the necessary configuration mappings.
 %%------------------------------------------------------------------------------
 verify_cfg(Cfg) when is_map(Cfg) ->
+    Facility = syslog_lib:get_property(facility, ?SYSLOG_FACILITY),
+    CrashFacility = syslog_lib:get_property(crash_facility, ?SYSLOG_FACILITY),
+    ExtraReport = Facility =/= CrashFacility,
     HandlerCfg0 = maps_get(config, Cfg, #{}),
     HandlerCfg1 = maps_put_if_not_present(sd_id, undefined, HandlerCfg0),
     HandlerCfg2 = maps_put_if_not_present(meta_keys, [], HandlerCfg1),
+    HandlerCfg3 = maps:put(extra_report, ExtraReport, HandlerCfg2),
     Formatter = syslog_lib:get_property(formatter, ?FORMATTER),
-    {ok, Cfg#{config => HandlerCfg2, formatter => Formatter}};
+    {ok, Cfg#{config => HandlerCfg3, formatter => Formatter}};
 verify_cfg(Cfg) ->
     {error, {invalid_config, Cfg}}.
 

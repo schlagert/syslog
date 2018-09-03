@@ -183,21 +183,30 @@ error_logger_test_() ->
                      ok = lists:foreach(Receive, lists:seq(1, 18)),
                      ?assertEqual(timeout, read(Devices)),
 
-                     %% test (extra) crash_report
-
-                     Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
-                     Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
-                     Proc = pid_to_list(Pid),
-
-                     Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
-                         Proc ++ " - exited with {exit,test_reason}",
-                     ?assertEqual(ok, wait_for(Devices, Re)),
-
                      teardown(Devices)
              end};
         false ->
             fun() -> ok end
     end.
+
+extra_crash_report_test_() ->
+    {timeout,
+     5,
+     fun() ->
+             Devices = setup(rfc3164, udp, debug),
+
+             %% test (extra) crash_report
+
+             Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
+             Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
+             Proc = pid_to_list(Pid),
+
+             Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
+                 Proc ++ " - exited with {exit,test_reason}",
+             ?assertEqual(ok, wait_for(Devices, Re)),
+
+             teardown(Devices)
+     end}.
 
 unicode_test_() ->
     {timeout,
