@@ -115,7 +115,7 @@ handle_event({log, Msg}, State = #state{log_level = Level}) ->
             syslog_logger:log(get_severity(Msg),
                               get_pid(Msg),
                               apply(lager_msg, timestamp, [Msg]),
-                              metadata_to_sd(Msg, State),
+                              get_structured_data(Msg, State),
                               format_msg(Msg, State),
                               no_format,
                               get_appname_override(Msg, State));
@@ -203,17 +203,13 @@ level_to_mask(Level) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-metadata_to_sd(_Msg, #state{sd_id = undefined}) ->
+get_structured_data(_Msg, #state{sd_id = undefined}) ->
     [];
-metadata_to_sd(_Msg, #state{metadata_keys = []}) ->
+get_structured_data(_Msg, #state{metadata_keys = []}) ->
     [];
-metadata_to_sd(Msg, #state{sd_id = SDataId, metadata_keys = MDKeys}) ->
+get_structured_data(Msg, #state{sd_id = SDId, metadata_keys = MDKeys}) ->
     try apply(lager_msg, metadata, [Msg]) of
-        Metadata ->
-            case [D || D = {K, _} <- Metadata, lists:member(K, MDKeys)] of
-                []     -> [];
-                Result -> [{SDataId, Result}]
-            end
+        Metadata -> syslog_lib:get_structured_data(Metadata, SDId, MDKeys)
     catch
         _:_ -> []
     end.

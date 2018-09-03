@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2013-2017, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2018, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -27,7 +27,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -36,12 +36,6 @@
          handle_info/2,
          code_change/3,
          terminate/2]).
-
--define(REGISTRATIONS,
-        [
-         %% Manager     Handler
-         {error_logger, syslog_error_h}
-        ]).
 
 -include("syslog.hrl").
 
@@ -55,8 +49,9 @@
 %% event handler at the appropriate event manager (`error_logger').
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link() -> {ok, pid()} | {error, term()}.
-start_link() -> gen_server:start_link(?MODULE, [], []).
+-spec start_link(boolean()) -> {ok, pid()} | {error, term()}.
+start_link(HasErrorLogger) ->
+    gen_server:start_link(?MODULE, [HasErrorLogger], []).
 
 %%%=============================================================================
 %%% gen_server callbacks
@@ -67,12 +62,9 @@ start_link() -> gen_server:start_link(?MODULE, [], []).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([]) ->
-    UseErrLogger = syslog_lib:get_property(syslog_error_logger, true),
-    Regs = [R || R = {M, _} <- ?REGISTRATIONS,
-                 M =/= error_logger orelse UseErrLogger],
-    ok = lists:foreach(fun add_handler/1, Regs),
-    {ok, #state{}}.
+init([HasErrorLogger]) ->
+    UseErrorLogger = syslog_lib:get_property(syslog_error_logger, true),
+    {ok = add_handler(HasErrorLogger andalso UseErrorLogger), #state{}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -87,13 +79,10 @@ handle_cast(_Request, State) -> {noreply, State}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({gen_event_EXIT, _Handler, shutdown}, State) ->
-    %% the respective event manager was shutdown properly, we can also RIP
-    {stop, normal, State};
-handle_info({gen_event_EXIT, Handler, Reason}, State) ->
+handle_info({gen_event_EXIT, syslog_error_h, Reason}, State) ->
     %% accidential unregistration, try to re-subscribe the event handler
-    ok = ?ERR("~s - handler ~w exited with ~w~n", [?MODULE, Handler, Reason]),
-    ok = add_handler(lists:keyfind(Handler, 2, ?REGISTRATIONS)),
+    ok = ?ERR("~s - handler syslog_error_h exited with ~w~n", [?MODULE, Reason]),
+    ok = add_handler(true),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -115,6 +104,8 @@ terminate(_Reason, _State) -> ok.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-add_handler({Manager, Handler}) ->
-    ok = gen_event:add_sup_handler(Manager, Handler, []),
-    ?ERR("~s - added handler ~w to manager ~s~n", [?MODULE, Handler, Manager]).
+add_handler(true) ->
+    ok = ?ERR("~s - adding handler syslog_error_h to error_logger~n", [?MODULE]),
+    gen_event:add_sup_handler(error_logger, syslog_error_h, []);
+add_handler(false) ->
+    ok.

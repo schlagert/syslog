@@ -1,6 +1,6 @@
 %%%=============================================================================
 %%% Copyright 2011, Travelping GmbH <info@travelping.com>
-%%% Copyright 2013-2017, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2013-2018, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above

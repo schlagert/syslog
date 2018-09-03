@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2014-2017, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2014-2018, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,10 @@
    ]},
   {applications, [kernel, stdlib, sasl]},
   {mod, {syslog, []}},
-  {env, []},
+  {env,
+   [
+    {logger, [{handler, syslog, syslog_logger_h, #{}}]}
+   ]},
   {maintainers, ["Tobias Schlager"]},
   {licenses, ["MIT"]},
   {links, [{"Github", "https://github.com/schlagert/syslog"}]},

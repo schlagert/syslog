@@ -163,36 +163,41 @@ log_level_test_() ->
      end}.
 
 error_logger_test_() ->
-    {timeout,
-     5,
-     fun() ->
-             Devices = setup(rfc3164, udp, debug, 20),
+    case syslog_lib:has_error_logger() of
+        true ->
+            {timeout,
+             5,
+             fun() ->
+                     Devices = setup(rfc3164, udp, debug, 20),
 
-             %% test message queue limit and drop percentage
+                     %% test message queue limit and drop percentage
 
-             erlang:suspend_process(whereis(error_logger)),
+                     erlang:suspend_process(whereis(error_logger)),
 
-             Send = fun(I) -> error_logger:info_msg("Message ~w", [I]) end,
-             ok = lists:foreach(Send, lists:seq(1, 30)),
+                     Send = fun(I) -> error_logger:info_msg("Message ~w", [I]) end,
+                     ok = lists:foreach(Send, lists:seq(1, 30)),
 
-             erlang:resume_process(whereis(error_logger)),
+                     erlang:resume_process(whereis(error_logger)),
 
-             Receive = fun(_) -> ?assert(is_list(read(Devices))) end,
-             ok = lists:foreach(Receive, lists:seq(1, 18)),
-             ?assertEqual(timeout, read(Devices)),
+                     Receive = fun(_) -> ?assert(is_list(read(Devices))) end,
+                     ok = lists:foreach(Receive, lists:seq(1, 18)),
+                     ?assertEqual(timeout, read(Devices)),
 
-             %% test (extra) crash_report
+                     %% test (extra) crash_report
 
-             Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
-             Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
-             Proc = pid_to_list(Pid),
+                     Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
+                     Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
+                     Proc = pid_to_list(Pid),
 
-             Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
-                 Proc ++ " - exited with {exit,test_reason}",
-             ?assertEqual(ok, wait_for(Devices, Re)),
+                     Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
+                         Proc ++ " - exited with {exit,test_reason}",
+                     ?assertEqual(ok, wait_for(Devices, Re)),
 
-             teardown(Devices)
-     end}.
+                     teardown(Devices)
+             end};
+        false ->
+            fun() -> ok end
+    end.
 
 unicode_test_() ->
     {timeout,

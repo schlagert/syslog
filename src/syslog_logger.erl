@@ -121,7 +121,7 @@ start_link() ->
 %%------------------------------------------------------------------------------
 -spec log(syslog:severity(),
           syslog:proc_name(),
-          erlang:timestamp(),
+          erlang:timestamp() | pos_integer(),
           [syslog:sd_element()],
           io:format() | iolist(),
           [term()] | no_format) -> ok.
@@ -136,7 +136,7 @@ log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
 %%------------------------------------------------------------------------------
 -spec log(syslog:severity(),
           syslog:proc_name(),
-          erlang:timestamp(),
+          erlang:timestamp() | pos_integer(),
           [syslog:sd_element()],
           io:format() | iolist(),
           [term()] | no_format,
@@ -152,7 +152,7 @@ log(Severity, Pid, Timestamp, SD, Fmt, Args, Overrides) ->
 %%------------------------------------------------------------------------------
 -spec async_log(syslog:severity(),
                 syslog:proc_name(),
-                erlang:timestamp(),
+                erlang:timestamp() | pos_integer(),
                 [syslog:sd_element()],
                 io:format() | iolist(),
                 [term()] | no_format) -> ok.
@@ -168,7 +168,7 @@ async_log(Severity, Pid, Timestamp, SD, Fmt, Args) ->
 %%------------------------------------------------------------------------------
 -spec async_log(syslog:severity(),
                 syslog:proc_name(),
-                erlang:timestamp(),
+                erlang:timestamp() | pos_integer(),
                 [syslog:sd_element()],
                 io:format() | iolist(),
                 [term()] | no_format,
@@ -390,10 +390,8 @@ do_log(Severity, Pid, Timestamp, StructuredData, Msg, Opts) ->
     MSG = unicode:characters_to_binary(Msg),
     Fun = do_log_fun(PRI, HDR, StructuredData, Opts),
     case Opts#opts.multiline of
-        true ->
-            Fun(MSG);
-        false ->
-            lists:foreach(Fun, binary:split(MSG, ?SEPARATORS, [global]))
+        true  -> Fun(MSG);
+        false -> lists:foreach(Fun, binary:split(MSG, ?SEPARATORS, [global]))
     end.
 
 %%------------------------------------------------------------------------------

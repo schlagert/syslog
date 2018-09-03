@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2016-2017, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2016-2018, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -25,27 +25,23 @@
 monitor_test() ->
     process_flag(trap_exit, true),
 
-    ok = start(sasl),
-    ok = start(syslog),
+    {ok, Started} = application:ensure_all_started(syslog),
 
-    ?assert(has_hander(syslog_error_h, error_logger)),
-    gen_event:delete_handler(error_logger, syslog_error_h, []),
-    timer:sleep(500),
-    ?assert(has_hander(syslog_error_h, error_logger)),
+    case syslog_lib:has_error_logger() of
+        true ->
+            ?assert(has_hander(syslog_error_h, error_logger)),
+            gen_event:delete_handler(error_logger, syslog_error_h, []),
+            timer:sleep(500),
+            ?assert(has_hander(syslog_error_h, error_logger));
+        false ->
+            ok
+    end,
 
-    application:stop(syslog),
-    application:stop(sasl).
+    ok = lists:foreach(fun application:stop/1, Started).
 
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-start(App) -> start(App, application:start(App)).
-start(_, ok) -> ok;
-start(App, {error, {already_started, App}}) -> ok.
 
 %%------------------------------------------------------------------------------
 %% @private
