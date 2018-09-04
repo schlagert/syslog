@@ -29,6 +29,12 @@
 -define(RFC5424_TIME, "T\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\d\\d\\d").
 -define(RFC5424_ZONE, "(Z|(\\+|-)\\d\\d:\\d\\d)").
 
+-record(state, {
+          started :: [atom()],
+          devices :: [{gen_udp, gen_udp:socket()} |
+                      {gen_tcp, gen_tcp:socket()} |
+                      {file, file:io_device(), string()}]}).
+
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
@@ -43,7 +49,7 @@ rfc3164_test_() ->
      ]}.
 
 rfc3164(Transport) ->
-    Devices = setup(rfc3164, Transport, debug),
+    State = setup(rfc3164, Transport, debug),
 
     Proc = pid_to_list(self()),
     Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
@@ -57,30 +63,30 @@ rfc3164(Transport) ->
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re1, "started application syslog")),
+    ?assertEqual(ok, expect(State, Re1, "started application syslog")),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re2)),
+    ?assertEqual(ok, expect(State, Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re3)),
+    ?assertEqual(ok, expect(State, Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
-    ?assertEqual(ok, expect(Devices, Re3)),
+    ?assertEqual(ok, expect(State, Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
     Re4 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello",
-    ?assertEqual(ok, expect(Devices, Re4)),
+    ?assertEqual(ok, expect(State, Re4)),
     Re5 = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - world",
-    ?assertEqual(ok, expect(Devices, Re5)),
+    ?assertEqual(ok, expect(State, Re5)),
 
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
     Re6 = "<131>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re6)),
+    ?assertEqual(ok, expect(State, Re6)),
 
-    teardown(Devices).
+    teardown(State).
 
 rfc5424_test_() ->
     {timeout,
@@ -92,7 +98,7 @@ rfc5424_test_() ->
      ]}.
 
 rfc5424(Transport) ->
-    Devices = setup(rfc5424, Transport, debug),
+    State = setup(rfc5424, Transport, debug),
 
     Proc = pid_to_list(self()),
     Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
@@ -104,62 +110,62 @@ rfc5424(Transport) ->
 
     ?assertEqual(ok, syslog:info_msg("hello world")),
     Re1 = "<30>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re1, "started application syslog")),
+    ?assertEqual(ok, expect(State, Re1, "started application syslog")),
 
     ?assertEqual(ok, syslog:msg(critical, "hello world", [])),
     Re2 = "<26>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re2)),
+    ?assertEqual(ok, expect(State, Re2)),
 
     ?assertEqual(ok, syslog:error_msg("hello ~s", ["world"])),
     Re3 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re3)),
+    ?assertEqual(ok, expect(State, Re3)),
 
     ?assertEqual(ok, error_logger:error_msg("hello ~s", ["world"])),
-    ?assertEqual(ok, expect(Devices, Re3)),
+    ?assertEqual(ok, expect(State, Re3)),
 
     ?assertEqual(ok, syslog:error_msg("~nhello~n~s~n", ["world"])),
     Re4 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello",
-    ?assertEqual(ok, expect(Devices, Re4)),
+    ?assertEqual(ok, expect(State, Re4)),
     Re5 = "<27>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - world",
-    ?assertEqual(ok, expect(Devices, Re5)),
+    ?assertEqual(ok, expect(State, Re5)),
 
     ?assertEqual(ok, syslog:msg(crash, "hello world", [])),
     Re6 = "<131>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " - hello world",
-    ?assertEqual(ok, expect(Devices, Re6)),
+    ?assertEqual(ok, expect(State, Re6)),
 
     ?assertEqual(ok, syslog:msg(notice, self(), StructuredData, "", [])),
     Re7 = "<29>1 " ++ Date ++ " .+ \\w+ \\d+ " ++ Proc ++ " "
         "\\[myid@1234 a=\"1\" b=\"2.5\"\\]"
         "\\[myid@2345 c=\"1\" d=\"2\"\\]",
-    ?assertEqual(ok, expect(Devices, Re7)),
+    ?assertEqual(ok, expect(State, Re7)),
 
     ?assertEqual(ok, syslog:msg(notice, self(), StructuredData, "info", [])),
     Re8 = Re7 ++ " info",
-    ?assertEqual(ok, expect(Devices, Re8)),
+    ?assertEqual(ok, expect(State, Re8)),
 
-    teardown(Devices).
+    teardown(State).
 
 log_level_test_() ->
     {timeout,
      5,
      fun() ->
-             Devices = setup(rfc5424, udp, notice),
+             State = setup(rfc5424, udp, notice),
 
              Proc = pid_to_list(self()),
              Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
 
              ?assertEqual(ok, syslog:debug_msg("hello world")),
              ?assertEqual(ok, syslog:info_msg("hello world")),
-             ?assertEqual(timeout, read(Devices)),
+             ?assertEqual(timeout, read(State)),
 
              ?assertEqual(ok, syslog:set_log_level(debug)),
 
              ?assertEqual(ok, syslog:debug_msg("hello world")),
              Re1 = "<31>1 " ++ Date ++ " .+ \\w+ \\d+ "
                  ++ Proc ++ " - hello world",
-             ?assertMatch({match, _}, re:run(read(Devices), Re1)),
+             ?assertMatch({match, _}, re:run(read(State), Re1)),
 
-             teardown(Devices)
+             teardown(State)
      end}.
 
 error_logger_test_() ->
@@ -168,7 +174,7 @@ error_logger_test_() ->
             {timeout,
              5,
              fun() ->
-                     Devices = setup(rfc3164, udp, debug, 20),
+                     State = setup(rfc3164, udp, debug, 20),
 
                      %% test message queue limit and drop percentage
 
@@ -179,11 +185,11 @@ error_logger_test_() ->
 
                      erlang:resume_process(whereis(error_logger)),
 
-                     Receive = fun(_) -> ?assert(is_list(read(Devices))) end,
+                     Receive = fun(_) -> ?assert(is_list(read(State))) end,
                      ok = lists:foreach(Receive, lists:seq(1, 18)),
-                     ?assertEqual(timeout, read(Devices)),
+                     ?assertEqual(timeout, read(State)),
 
-                     teardown(Devices)
+                     teardown(State)
              end};
         false ->
             fun() -> ok end
@@ -193,7 +199,7 @@ extra_crash_report_test_() ->
     {timeout,
      5,
      fun() ->
-             Devices = setup(rfc3164, udp, debug),
+             State = setup(rfc3164, udp, debug),
 
              %% test (extra) crash_report
 
@@ -203,16 +209,16 @@ extra_crash_report_test_() ->
 
              Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
                  Proc ++ " - exited with {exit,test_reason}",
-             ?assertEqual(ok, wait_for(Devices, Re)),
+             ?assertEqual(ok, wait_for(State, Re)),
 
-             teardown(Devices)
+             teardown(State)
      end}.
 
 unicode_test_() ->
     {timeout,
      5,
      fun() ->
-             Devices = setup(rfc5424, udp, debug),
+             State = setup(rfc5424, udp, debug),
 
              Proc = pid_to_list(self()),
              Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
@@ -223,9 +229,9 @@ unicode_test_() ->
                                            (list_to_binary(Proc))/binary,
                                            " - äöü"/utf8>>, []),
              ?assertEqual(ok, syslog:debug_msg("~ts", [<<"äöü"/utf8>>])),
-             ?assertMatch({match, _}, re:run(read(Devices), Compiled)),
+             ?assertMatch({match, _}, re:run(read(State), Compiled)),
 
-             teardown(Devices)
+             teardown(State)
      end}.
 
 %%%=============================================================================
@@ -242,43 +248,41 @@ setup(Protocol, Transport, LogLevel) ->
 %% @private
 %%------------------------------------------------------------------------------
 setup(Protocol, udp, LogLevel, Limit) ->
-    ok = setup_apps({Protocol, udp}, LogLevel, Limit),
+    {ok, Started} = setup_apps({Protocol, udp}, LogLevel, Limit),
     {ok, Socket} = gen_udp:open(?TEST_PORT, [list]),
     ok = empty_mailbox(),
-    [{gen_udp, Socket}];
+    #state{started = Started, devices = [{gen_udp, Socket}]};
 setup(Protocol, tcp, LogLevel, Limit) ->
     {ok, Server} = gen_tcp:listen(?TEST_PORT, [list, {reuseaddr, true}]),
-    ok = setup_apps({Protocol, tcp}, LogLevel, Limit),
+    {ok, Started} = setup_apps({Protocol, tcp}, LogLevel, Limit),
     {ok, Socket} = gen_tcp:accept(Server),
     ok = empty_mailbox(),
-    [{gen_tcp, Socket}, {gen_tcp, Server}];
+    #state{started = Started, devices = [{gen_tcp, Socket}, {gen_tcp, Server}]};
 setup(Protocol, File, LogLevel, Limit) ->
-    ok = setup_apps({Protocol, File}, LogLevel, Limit),
+    {ok, Started} = setup_apps({Protocol, File}, LogLevel, Limit),
     ok = file:write_file(File, <<>>),
     {ok, IoDevice} = file:open(File, [read]),
     ok = empty_mailbox(),
-    [{file, IoDevice, File}].
+    #state{started = Started, devices = [{file, IoDevice, File}]}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 setup_apps(Protocol, LogLevel, Limit) ->
-    ok = application:start(sasl),
-    ok = load(syslog),
+    ok = ensure_loaded(syslog),
     ok = application:set_env(syslog, dest_port, ?TEST_PORT),
     ok = application:set_env(syslog, protocol, Protocol),
     ok = application:set_env(syslog, crash_facility, local0),
     ok = application:set_env(syslog, log_level, LogLevel),
     ok = application:set_env(syslog, msg_queue_limit, Limit),
     ok = application:set_env(syslog, no_progress, true),
-    application:start(syslog).
+    application:ensure_all_started(syslog).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-teardown(Devices) ->
-    application:stop(syslog),
-    application:stop(sasl),
+teardown(#state{started = Started, devices = Devices}) ->
+    lists:foreach(fun application:stop/1, Started),
     application:unset_env(syslog, dest_port),
     application:unset_env(syslog, protocol),
     application:unset_env(syslog, crash_facility),
@@ -296,37 +300,40 @@ teardown(Devices) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-load(App) -> load(App, application:load(App)).
-load(_, ok) -> ok;
-load(App, {error, {already_loaded, App}}) -> ok.
+ensure_loaded(App) ->
+    case application:load(App) of
+        ok                             -> ok;
+        {error, {already_loaded, App}} -> ok;
+        Error                          -> Error
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-wait_for(Devices, Pattern) ->
-    case expect(Devices, Pattern) of
-        {nomatch, _, _} -> wait_for(Devices, Pattern);
+wait_for(State, Pattern) ->
+    case expect(State, Pattern) of
+        {nomatch, _, _} -> wait_for(State, Pattern);
         Other           -> Other
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-expect(Devices, Pattern) ->
-    expect(Devices, Pattern, "").
+expect(State, Pattern) ->
+    expect(State, Pattern, "").
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-expect(Devices, Pattern, Ignore) ->
-    case read(Devices) of
+expect(State, Pattern, Ignore) ->
+    case read(State) of
         L when is_list(L) ->
             case re:run(L, Pattern, [{capture, none}]) of
                 nomatch when Ignore =:= "" ->
                     {nomatch, L, Pattern};
                 nomatch ->
                     case re:run(L, Ignore, [{capture, none}]) of
-                        match   -> expect(Devices, Pattern, "");
+                        match   -> expect(State, Pattern, "");
                         nomatch -> {nomatch, L, [Pattern, Ignore]}
                     end;
                 match ->
@@ -339,7 +346,7 @@ expect(Devices, Pattern, Ignore) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read(Devices = [Device | _]) ->
+read(State = #state{devices = [Device | _]}) ->
     Acc = proplists:get_value(acc, get(), []),
     case {read_message(Acc), Device} of
         {{ok, {Message, Rest}}, _} ->
@@ -351,7 +358,7 @@ read(Devices = [Device | _]) ->
                     Message;
                 {tcp, Socket, Data} ->
                     put(acc, Acc ++ Data),
-                    read(Devices)
+                    read(State)
             after
                 500 -> timeout
             end;
@@ -361,7 +368,7 @@ read(Devices = [Device | _]) ->
                     lists:reverse(tl(lists:reverse(Data)));
                 eof ->
                     ok = timer:sleep(50),
-                    read(Devices);
+                    read(State);
                 Other ->
                     Other
             end
