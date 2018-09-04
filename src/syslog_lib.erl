@@ -23,6 +23,8 @@
 %% API
 -export([get_hostname/1,
          get_name/0,
+         get_appname_metdata_key/0,
+         get_appname_metdata_key/1,
          get_property/2,
          get_property/3,
          get_pid/1,
@@ -96,6 +98,32 @@ get_name() ->
         {ok, Name} -> to_type(binary, Name);
         undefined  -> get_name_from_node(node())
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the key that should be used to lookup a message metadata value to
+%% place in the `APP-NAME' field. If a message metadata field contains such a
+%% mapping this will have higher precendence over names configured/returned by
+%% {@link get_name/0}. `undefined' is used as the invalue/unconfigured value.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_appname_metdata_key() -> atom() | undefined.
+get_appname_metdata_key() ->
+    case ?GET_ENV(appname_from_metadata) of
+        {ok, Value} -> get_appname_metdata_key(Value);
+        undefined   -> undefined
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Utility function that convert the given value to an appname metadata key.
+%% @see get_appname_metdata_key/0
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_appname_metdata_key(atom() | boolean()) -> atom() | undefined.
+get_appname_metdata_key(true)                      -> application;
+get_appname_metdata_key(false)                     -> undefined;
+get_appname_metdata_key(Value) when is_atom(Value) -> Value.
 
 %%------------------------------------------------------------------------------
 %% @doc

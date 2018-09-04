@@ -43,8 +43,7 @@
 
 -include("syslog.hrl").
 
--define(FORMATTER, {logger_formatter, #{single_line => false,
-                                        template => [msg]}}).
+-define(FORMATTER_CFG, #{single_line => false, template => [msg]}).
 
 %%%=============================================================================
 %%% API
@@ -143,46 +142,51 @@ log_impl(LogEvent = #{level := Level, msg := Msg, meta := Metadata},
     Time = maps_get(time, Metadata, os:timestamp()),
     SD = structured_data(Msg, Metadata, HandlerCfg),
     LogMsg = Fmt:format(LogEvent, FmtCfg),
+    Overrides = overrides(Metadata, HandlerCfg),
     case {maps:find(extra_report, HandlerCfg), Level, Msg} of
         {{ok, true}, error, {report, #{label := {supervisor, _}}}} ->
-            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format);
+            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format, Overrides);
         {{ok, true}, error, {report, #{label := {_, terminate}}}} ->
-            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format);
+            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format, Overrides);
         {{ok, true}, error, {report, Report = #{label := {_, crash}}}} ->
-            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format),
+            syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format, Overrides),
             case maps_get(report, Report, []) of
                 [ProcEnv | _] when is_list(ProcEnv) ->
                     ErrorInfo = proplists:get_value(error_info, ProcEnv),
-                    log_extra_report(Pid, Time, ErrorInfo);
+                    log_extra_report(Pid, Time, Overrides, ErrorInfo);
                 _ ->
                     ok
             end;
         _ ->
             Severity = level_to_severity(Level),
-            syslog_logger:log(Severity, Pid, Time, SD, LogMsg, no_format)
+            syslog_logger:log(Severity, Pid, Time, SD, LogMsg, no_format, Overrides)
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log_extra_report(Pid, Time, {Class, Reason, [{M, F, Args, Ps} | _]})
+log_extra_report(Pid, Time, Overrides, {Class, Reason, [{M, F, Args, Ps} | _]})
   when is_list(Args) ->
     As = lists:join($,, [io_lib:format("~w", [A]) || A <- Args]),
     Fmt = "exited with ~w at ~s:~s(~s)~s",
     Args = [{Class, Reason}, M, F, As, get_line(Ps)],
-    syslog_logger:log(error, Pid, Time, [], Fmt, Args);
-log_extra_report(Pid, Time, {Class, Reason, [{M, F, Arity, Ps} | _]})
+    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
+log_extra_report(Pid, Time, Overrides, {Class, Reason, [{M, F, Arity, Ps} | _]})
   when is_integer(Arity) ->
     Fmt = "exited with ~w at ~s:~s/~w~s",
     Args = [{Class, Reason}, M, F, Arity, get_line(Ps)],
-    syslog_logger:log(error, Pid, Time, [], Fmt, Args);
-log_extra_report(Pid, Time, {Class, Reason, _}) ->
+    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
+log_extra_report(Pid, Time, Overrides, {Class, Reason, _}) ->
+    Fmt = "exited with ~w",
     Args = [{Class, Reason}],
-    syslog_logger:log(error, Pid, Time, [], "exited with ~w", Args);
-log_extra_report(Pid, Time, {Class, {Reason, Stack}}) when is_list(Stack) ->
-    log_extra_report(Pid, Time, {Class, Reason, Stack});
-log_extra_report(Pid, Time, Reason) ->
-    syslog_logger:log(error, Pid, Time, [], "exited with ~w", [Reason]).
+    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
+log_extra_report(Pid, Time, Overrides, {Class, {Reason, Stack}})
+  when is_list(Stack) ->
+    log_extra_report(Pid, Time, Overrides, {Class, Reason, Stack});
+log_extra_report(Pid, Time, Overrides, Reason) ->
+    Fmt = "exited with ~w",
+    Args = [Reason],
+    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -210,6 +214,22 @@ structured_data(_, Metadata, #{sd_id := SDId, meta_keys := MDKeys}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+overrides(Metadata, HandlerCfg) -> appname_override(Metadata, HandlerCfg).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+appname_override(_, #{appname_key := undefined}) ->
+    [];
+appname_override(Metadata, #{appname_key := AppnameKey}) ->
+    case maps:find(AppnameKey, Metadata) of
+        {ok, Value} -> [{appname, Value}];
+        error       -> []
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 level_to_severity(info)                      -> informational;
 level_to_severity(Level) when is_atom(Level) -> Level.
 
@@ -221,19 +241,23 @@ verify_cfg(Cfg) when is_map(Cfg) ->
     HandlerCfg0 = maps_get(config, Cfg, #{}),
     HandlerCfg1 = maps_put_if_not_present(sd_id, undefined, HandlerCfg0),
     HandlerCfg2 = maps_put_if_not_present(meta_keys, [], HandlerCfg1),
+
     Facility = syslog_lib:get_property(facility, ?SYSLOG_FACILITY),
     CrashFacility = syslog_lib:get_property(crash_facility, ?SYSLOG_FACILITY),
     ExtraReport = Facility =/= CrashFacility,
     HandlerCfg3 = maps:put(extra_report, ExtraReport, HandlerCfg2),
-    Cfg1 = maps:put(config, HandlerCfg3, Cfg),
+
+    AppnameKey = syslog_lib:get_appname_metdata_key(),
+    HandlerCfg4 = maps_put_if_not_present(appname_key, AppnameKey, HandlerCfg3),
+    Cfg1 = maps:put(config, HandlerCfg4, Cfg),
 
     NoProgress = syslog_lib:get_property(no_progress, ?SYSLOG_NO_PROGRESS),
     ProgressAction = case NoProgress of true -> stop; false -> log end,
     Filters = [{progress, {fun logger_filters:progress/2, ProgressAction}}],
     Cfg2 = maps_put_if_not_present(filters, Filters, Cfg1),
 
-    Formatter = syslog_lib:get_property(formatter, ?FORMATTER),
-    {ok, maps:put(formatter, Formatter, Cfg2)};
+    FormatterCfg = syslog_lib:get_property(formatter_cfg, ?FORMATTER_CFG),
+    {ok, maps:put(formatter, {logger_formatter, FormatterCfg}, Cfg2)};
 verify_cfg(Cfg) ->
     {error, {invalid_config, Cfg}}.
 

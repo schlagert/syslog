@@ -71,7 +71,7 @@ set_log_level(Level) ->
           format_cfg      :: list(),
           sd_id           :: string() | undefined,
           metadata_keys   :: [atom()],
-          use_msg_appname :: boolean()}).
+          appname_key     :: atom() | undefined}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -84,11 +84,12 @@ init([Level, {}, {Formatter, FormatterConfig}]) when is_atom(Formatter) ->
     init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
 init([Level, SData, {Formatter, FormatterConfig}])
   when is_atom(Formatter) ->
-    init([Level, SData, {Formatter, FormatterConfig}, false]);
-init([Level, {}, {Formatter, FormatterConfig}, UseMsgAppName])
+    AppnameKey = syslog_lib:get_appname_metdata_key(),
+    init([Level, SData, {Formatter, FormatterConfig}, AppnameKey]);
+init([Level, {}, {Formatter, FormatterConfig}, AppnameKey])
   when is_atom(Formatter) ->
-    init([Level, {undefined, []}, {Formatter, FormatterConfig}, UseMsgAppName]);
-init([Level, {SDataId, MDKeys}, {Formatter, FormatterConfig}, UseMsgAppName])
+    init([Level, {undefined, []}, {Formatter, FormatterConfig}, AppnameKey]);
+init([Level, {SDataId, MDKeys}, {Formatter, FormatterConfig}, AppnameKey])
   when is_atom(Formatter) ->
     {ok, #state{
             log_level = level_to_mask(Level),
@@ -96,7 +97,7 @@ init([Level, {SDataId, MDKeys}, {Formatter, FormatterConfig}, UseMsgAppName])
             metadata_keys = MDKeys,
             formatter = Formatter,
             format_cfg = FormatterConfig,
-            use_msg_appname = UseMsgAppName}}.
+            appname_key = syslog_lib:get_appname_metdata_key(AppnameKey)}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -216,12 +217,12 @@ get_structured_data(Msg, #state{sd_id = SDId, metadata_keys = MDKeys}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_appname_override(_, #state{use_msg_appname = false}) ->
+get_appname_override(_, #state{appname_key = undefined}) ->
     [];
-get_appname_override(Msg, #state{use_msg_appname = true}) ->
+get_appname_override(Msg, #state{appname_key = Key}) ->
     try lager_msg:metadata(Msg) of
         Metadata ->
-            case proplists:get_value(application, Metadata) of
+            case proplists:get_value(Key, Metadata) of
                 undefined -> [];
                 Result    -> [{appname, Result}]
             end
