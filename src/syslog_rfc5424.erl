@@ -93,8 +93,10 @@ sd_param({Name, Value}) -> [$\s, to_iolist(Name), $=, $", to_iolist(Value), $"].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-to_iolist(A) when is_atom(A)    -> atom_to_binary(A, utf8);
-to_iolist(B) when is_binary(B)  -> B;
-to_iolist(F) when is_float(F)   -> io_lib:format("~w", [F]);
-to_iolist(I) when is_integer(I) -> integer_to_list(I);
-to_iolist(L) when is_list(L)    -> iolist_to_binary(L).
+to_iolist(A) when is_atom(A)      -> atom_to_binary(A, utf8);
+to_iolist(B) when is_binary(B)    -> B;
+to_iolist(F) when is_float(F)     -> io_lib:format("~w", [F]);
+to_iolist(I) when is_integer(I)   -> integer_to_list(I);
+to_iolist(L) when is_list(L)      -> iolist_to_binary(L);
+to_iolist(P) when is_pid(P)       -> pid_to_list(P);
+to_iolist(R) when is_reference(R) -> erlang:ref_to_list(R).

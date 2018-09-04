@@ -174,7 +174,7 @@ error_logger_test_() ->
             {timeout,
              5,
              fun() ->
-                     State = setup(rfc3164, udp, debug, 20),
+                     State = setup(rfc3164, udp, debug, 20, true),
 
                      %% test message queue limit and drop percentage
 
@@ -234,6 +234,45 @@ unicode_test_() ->
              teardown(State)
      end}.
 
+lager_integration_test_() ->
+    {timeout,
+     5,
+     fun() ->
+             State = setup(rfc5424, udp, debug, infinity, false),
+             case ensure_loaded(lager) of
+                 ok ->
+                     ok = application:set_env(lager, error_logger_redirect, false),
+                     Handler = {syslog_lager_backend,
+                                [
+                                 debug,
+                                 {"sd_id", [pid]},
+                                 {lager_default_formatter, [message]},
+                                 true
+                                ]},
+                     ok = application:set_env(lager, handlers, [Handler]),
+                     {ok, Started} = application:ensure_all_started(lager),
+
+                     Metadata = [{pid, self()}, {application, syslog}],
+                     ok = lager:log(notice, Metadata, "hello ~s", ["world"]),
+
+                     Proc = pid_to_list(self()),
+                     Date = ?RFC5424_DATE ++ ?RFC5424_TIME ++ ?RFC5424_ZONE,
+                     Re = "<29>1 " ++ Date ++ " .+ syslog \\d+ " ++ Proc
+                         ++ " \\[sd_id pid=\"" ++ Proc ++ "\"\\] hello world",
+                     {ok, Compiled} = re:compile(Re, []),
+                     ?assertMatch({match, _}, re:run(read(State), Compiled)),
+
+                     file:delete("log/crash.log"),
+                     file:del_dir("log"),
+
+                     ok = lists:foreach(fun application:stop/1, Started),
+                     ok = lists:foreach(fun application:unload/1, Started);
+                 _ ->
+                     ok %% no lager available, e.g. rebar2 build?
+             end,
+             teardown(State)
+     end}.
+
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
@@ -242,24 +281,24 @@ unicode_test_() ->
 %% @private
 %%------------------------------------------------------------------------------
 setup(Protocol, Transport, LogLevel) ->
-    setup(Protocol, Transport, LogLevel, infinity).
+    setup(Protocol, Transport, LogLevel, infinity, true).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-setup(Protocol, udp, LogLevel, Limit) ->
-    {ok, Started} = setup_apps({Protocol, udp}, LogLevel, Limit),
+setup(Protocol, udp, LogLevel, Limit, Integrate) ->
+    {ok, Started} = setup_apps({Protocol, udp}, LogLevel, Limit, Integrate),
     {ok, Socket} = gen_udp:open(?TEST_PORT, [list]),
     ok = empty_mailbox(),
     #state{started = Started, devices = [{gen_udp, Socket}]};
-setup(Protocol, tcp, LogLevel, Limit) ->
+setup(Protocol, tcp, LogLevel, Limit, Integrate) ->
     {ok, Server} = gen_tcp:listen(?TEST_PORT, [list, {reuseaddr, true}]),
-    {ok, Started} = setup_apps({Protocol, tcp}, LogLevel, Limit),
+    {ok, Started} = setup_apps({Protocol, tcp}, LogLevel, Limit, Integrate),
     {ok, Socket} = gen_tcp:accept(Server),
     ok = empty_mailbox(),
     #state{started = Started, devices = [{gen_tcp, Socket}, {gen_tcp, Server}]};
-setup(Protocol, File, LogLevel, Limit) ->
-    {ok, Started} = setup_apps({Protocol, File}, LogLevel, Limit),
+setup(Protocol, File, LogLevel, Limit, Integrate) ->
+    {ok, Started} = setup_apps({Protocol, File}, LogLevel, Limit, Integrate),
     ok = file:write_file(File, <<>>),
     {ok, IoDevice} = file:open(File, [read]),
     ok = empty_mailbox(),
@@ -268,7 +307,7 @@ setup(Protocol, File, LogLevel, Limit) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-setup_apps(Protocol, LogLevel, Limit) ->
+setup_apps(Protocol, LogLevel, Limit, Integrate) ->
     ok = ensure_loaded(syslog),
     ok = application:set_env(syslog, dest_port, ?TEST_PORT),
     ok = application:set_env(syslog, protocol, Protocol),
@@ -276,6 +315,13 @@ setup_apps(Protocol, LogLevel, Limit) ->
     ok = application:set_env(syslog, log_level, LogLevel),
     ok = application:set_env(syslog, msg_queue_limit, Limit),
     ok = application:set_env(syslog, no_progress, true),
+    case Integrate of
+        false ->
+            ok = application:set_env(syslog, logger, []),
+            ok = application:set_env(syslog, syslog_error_logger, false);
+        _ ->
+            ok
+    end,
     application:ensure_all_started(syslog).
 
 %%------------------------------------------------------------------------------
@@ -283,12 +329,7 @@ setup_apps(Protocol, LogLevel, Limit) ->
 %%------------------------------------------------------------------------------
 teardown(#state{started = Started, devices = Devices}) ->
     lists:foreach(fun application:stop/1, Started),
-    application:unset_env(syslog, dest_port),
-    application:unset_env(syslog, protocol),
-    application:unset_env(syslog, crash_facility),
-    application:unset_env(syslog, log_level),
-    application:unset_env(syslog, msg_queue_limit),
-    application:unset_env(syslog, drop_percentage),
+    application:unload(syslog),
     lists:foreach(
       fun({file, IoDevice, File}) ->
               file:close(IoDevice),
