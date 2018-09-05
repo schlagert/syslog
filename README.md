@@ -422,8 +422,8 @@ were blocked over 10 seconds.
   `syslog` does now integrate as a proper `logger` handler and inherited some of
   the nice features known from the `lager` backend, e.g. structured data from
   metadata (#15)
-* Change the default value for the `hostname_transform` option to `log`. This is
-  done to be compliant to RFC 5424 by default, even when short hostnames are
+* Change the default value for the `hostname_transform` option to `long`. This
+  is done to be compliant to RFC 5424 by default, even when short hostnames are
   used for Erlang distribution.
 
 ### 3.4.4
