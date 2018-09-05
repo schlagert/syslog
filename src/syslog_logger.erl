@@ -59,7 +59,7 @@
 -define(DEST_PORT, 514).
 -define(FACILITY, ?SYSLOG_FACILITY).
 -define(PROTOCOL, rfc3164).
--define(TRANSFORM, none).
+-define(TRANSFORM, long).
 -define(TRANSPORT, udp).
 -define(TIMEOUT, 1000).
 -define(MULTILINE, false).
