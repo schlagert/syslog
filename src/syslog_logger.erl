@@ -235,8 +235,8 @@ set_log_function(Function) ->
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    %% avoid excessive garbage collection
-    catch process_flag(message_queue_data, off_heap),
+    %% avoid excessive garbage collection, use apply for dialyzer
+    catch apply(erlang, process_flag, [message_queue_data, off_heap]),
     State = #state{
                protocol = syslog_lib:get_property(protocol, ?PROTOCOL),
                dest_host = syslog_lib:get_property(dest_host, ?DEST_HOST, ip_addr),
