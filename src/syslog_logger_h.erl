@@ -200,16 +200,16 @@ get_line(Proplist) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-structured_data(_, _, #{sd_id := undefined}) ->
-    [];
-structured_data(_, _, #{meta_keys := []}) ->
+structured_data(_, _, #{structured_data := []}) ->
     [];
 structured_data({report, Report}, Metadata, HandlerCfg) when is_map(Report) ->
     structured_data(ignored, maps:merge(Report, Metadata), HandlerCfg);
 structured_data({report, Report}, Metadata, HandlerCfg) when is_list(Report) ->
     structured_data({report, maps:from_list(Report)}, Metadata, HandlerCfg);
-structured_data(_, Metadata, #{sd_id := SDId, meta_keys := MDKeys}) ->
-    syslog_lib:get_structured_data(Metadata, SDId, MDKeys).
+structured_data(_, Metadata, #{structured_data := SDMappings}) ->
+    lists:append(
+      [syslog_lib:get_structured_data(Metadata, SDId, MDKeys)
+       || {SDId, MDKeys} <- SDMappings, is_list(MDKeys)]).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -239,17 +239,17 @@ level_to_severity(Level) when is_atom(Level) -> Level.
 %%------------------------------------------------------------------------------
 verify_cfg(Cfg) when is_map(Cfg) ->
     HandlerCfg0 = maps_get(config, Cfg, #{}),
-    HandlerCfg1 = maps_put_if_not_present(sd_id, undefined, HandlerCfg0),
-    HandlerCfg2 = maps_put_if_not_present(meta_keys, [], HandlerCfg1),
+    HandlerCfg1 = maps_put_if_not_present(structured_data, [], HandlerCfg0),
+    true = is_list(maps:get(structured_data, HandlerCfg1)),
 
     Facility = syslog_lib:get_property(facility, ?SYSLOG_FACILITY),
     CrashFacility = syslog_lib:get_property(crash_facility, ?SYSLOG_FACILITY),
     ExtraReport = Facility =/= CrashFacility,
-    HandlerCfg3 = maps:put(extra_report, ExtraReport, HandlerCfg2),
+    HandlerCfg2 = maps:put(extra_report, ExtraReport, HandlerCfg1),
 
     AppnameKey = syslog_lib:get_name_metdata_key(),
-    HandlerCfg4 = maps_put_if_not_present(appname_key, AppnameKey, HandlerCfg3),
-    Cfg1 = maps:put(config, HandlerCfg4, Cfg),
+    HandlerCfg3 = maps_put_if_not_present(appname_key, AppnameKey, HandlerCfg2),
+    Cfg1 = maps:put(config, HandlerCfg3, Cfg),
 
     NoProgress = syslog_lib:get_property(no_progress, ?SYSLOG_NO_PROGRESS),
     ProgressAction = case NoProgress of true -> stop; false -> log end,
