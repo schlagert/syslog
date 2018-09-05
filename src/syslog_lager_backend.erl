@@ -84,7 +84,7 @@ init([Level, {}, {Formatter, FormatterConfig}]) when is_atom(Formatter) ->
     init([Level, {undefined, []}, {Formatter, FormatterConfig}]);
 init([Level, SData, {Formatter, FormatterConfig}])
   when is_atom(Formatter) ->
-    AppnameKey = syslog_lib:get_appname_metdata_key(),
+    AppnameKey = syslog_lib:get_name_metdata_key(),
     init([Level, SData, {Formatter, FormatterConfig}, AppnameKey]);
 init([Level, {}, {Formatter, FormatterConfig}, AppnameKey])
   when is_atom(Formatter) ->
@@ -97,7 +97,7 @@ init([Level, {SDataId, MDKeys}, {Formatter, FormatterConfig}, AppnameKey])
             metadata_keys = MDKeys,
             formatter = Formatter,
             format_cfg = FormatterConfig,
-            appname_key = syslog_lib:get_appname_metdata_key(AppnameKey)}}.
+            appname_key = get_appname_key(AppnameKey)}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -213,6 +213,14 @@ get_structured_data(Msg, #state{sd_id = SDId, metadata_keys = MDKeys}) ->
     catch
         _:_ -> []
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Map `true' to `application' for backwards compatibility.
+%%------------------------------------------------------------------------------
+get_appname_key(true)                      -> application;
+get_appname_key(false)                     -> undefined;
+get_appname_key(Value) when is_atom(Value) -> Value.
 
 %%------------------------------------------------------------------------------
 %% @private

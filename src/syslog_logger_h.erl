@@ -247,7 +247,7 @@ verify_cfg(Cfg) when is_map(Cfg) ->
     ExtraReport = Facility =/= CrashFacility,
     HandlerCfg3 = maps:put(extra_report, ExtraReport, HandlerCfg2),
 
-    AppnameKey = syslog_lib:get_appname_metdata_key(),
+    AppnameKey = syslog_lib:get_name_metdata_key(),
     HandlerCfg4 = maps_put_if_not_present(appname_key, AppnameKey, HandlerCfg3),
     Cfg1 = maps:put(config, HandlerCfg4, Cfg),
 
