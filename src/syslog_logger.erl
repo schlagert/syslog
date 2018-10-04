@@ -65,7 +65,8 @@
 -define(MULTILINE, false).
 
 -define(SEPARATORS, [<<"\n">>, <<"\r">>]).
--define(TCP_OPTS, [{keepalive, true},
+-define(TCP_OPTS, [{active, false},
+                   {keepalive, true},
                    {reuseaddr, true},
                    {send_timeout, ?TIMEOUT},
                    {send_timeout_close, true}]).
@@ -551,12 +552,12 @@ get_protocol(P) when is_atom(P)         -> P.
 %% @private
 %%------------------------------------------------------------------------------
 get_transport({rfc5424, tls, []})   -> throw({tls_options_missing});
-get_transport({rfc5424, tls, Opts}) -> {tls, Opts};
+get_transport({rfc5424, tls, Opts}) -> {tls, [{active, false} | Opts]};
 get_transport({rfc5424, tls})       -> throw({tls_options_missing});
-get_transport({_, tcp, Opts})       -> {tcp, Opts};
+get_transport({_, tcp, Opts})       -> {tcp, [{active, false} | Opts]};
 get_transport({_, tcp})             -> {tcp, ?TCP_OPTS};
-get_transport({_, udp, Opts})       -> {udp, Opts};
-get_transport({_, udp})             -> {udp, []};
+get_transport({_, udp, Opts})       -> {udp, [{active, false} | Opts]};
+get_transport({_, udp})             -> {udp, [{active, false}]};
 get_transport({_, T, Opts})         -> {T, Opts};
 get_transport({_, T})               -> {T, []};
 get_transport(P) when is_atom(P)    -> get_transport({P, ?TRANSPORT}).
