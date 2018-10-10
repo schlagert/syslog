@@ -426,6 +426,11 @@ were blocked over 10 seconds.
   is done to be compliant to RFC 5424 by default, even when short hostnames are
   used for Erlang distribution.
 
+### 3.4.5
+
+* Do not open sockets in active mode. This prevents a socket `bind` which in
+  turn lets the socket listen for incoming traffic (thanks to @lukebakken)
+
 ### 3.4.4
 
 * Allow message header customizations, e.g. `APP-NAME` and/or `HOSTNAME` (thanks
