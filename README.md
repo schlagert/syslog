@@ -343,6 +343,10 @@ were blocked over 10 seconds.
 History
 -------
 
+### Master
+
+Currently no changes to latest release.
+
 ### 3.4.4
 
 * Allow message header customizations, e.g. `APP-NAME` and/or `HOSTNAME` (thanks
