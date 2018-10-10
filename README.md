@@ -343,9 +343,10 @@ were blocked over 10 seconds.
 History
 -------
 
-### Master
+### 3.4.5
 
-Currently no changes to latest release.
+* Do not open sockets in active mode. This prevents a socket `bind` which in
+  turn lets the socket listen for incoming traffic (thanks to @lukebakken)
 
 ### 3.4.4
 
