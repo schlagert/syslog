@@ -259,7 +259,8 @@ verify_cfg(Cfg) when is_map(Cfg) ->
     Cfg2 = maps_put_if_not_present(filters, Filters, Cfg1),
 
     FormatterCfg = syslog_lib:get_property(formatter_cfg, ?FORMATTER_CFG),
-    {ok, maps:put(formatter, {logger_formatter, FormatterCfg}, Cfg2)};
+    Formatter = maps:get(formatter, Cfg2, {logger_formatter, FormatterCfg}),
+    {ok, maps:put(formatter, Formatter, Cfg2)};
 verify_cfg(Cfg) ->
     {error, {invalid_config, Cfg}}.
 
