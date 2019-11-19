@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2018-2018, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2018-2019, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -43,7 +43,8 @@
 
 -include("syslog.hrl").
 
--define(FORMATTER_CFG, #{single_line => false, template => [msg]}).
+-define(FORMATTER, {logger_formatter,
+                    #{single_line => false, template => [msg]}}).
 
 -dialyzer({no_missing_calls, log_extra_report/4}).
 
@@ -258,9 +259,14 @@ verify_cfg(Cfg) when is_map(Cfg) ->
     Filters = [{progress, {fun logger_filters:progress/2, ProgressAction}}],
     Cfg2 = maps_put_if_not_present(filters, Filters, Cfg1),
 
-    FormatterCfg = syslog_lib:get_property(formatter_cfg, ?FORMATTER_CFG),
-    Formatter = maps:get(formatter, Cfg2, {logger_formatter, FormatterCfg}),
-    {ok, maps:put(formatter, Formatter, Cfg2)};
+    {ok, case maps:find(formatter, Cfg2) of
+             error ->
+                 maps:put(formatter, ?FORMATTER, Cfg2);
+             {ok, {logger_formatter, #{}}} -> %% the OTP default
+                 maps:put(formatter, ?FORMATTER, Cfg2);
+             {ok, _} ->
+                 Cfg2
+         end};
 verify_cfg(Cfg) ->
     {error, {invalid_config, Cfg}}.
 

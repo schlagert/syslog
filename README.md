@@ -214,10 +214,7 @@ Of course it is allowed to configure multiple structured data mappings, by
 default no metadata is packed as structured data.
 
 Additional handler configuration may be passed using the handler argument map
-like it would be done with other `logger` handlers. However, it is not possible
-to change the logger formatter module (it will always be `logger_formatter`).
-Only the formatter configuration can be changed using the `formatter_cfg`
-property of the `syslog` application environment.
+like it would be done with other `logger` handlers.
 
 Finally, to completely disable the `logger` integration (similar to setting
 `syslog_error_logger` to `false` in pre-OTP-21 releases) you'll have to
@@ -425,6 +422,8 @@ were blocked over 10 seconds.
 * Change the default value for the `hostname_transform` option to `long`. This
   is done to be compliant to RFC 5424 by default, even when short hostnames are
   used for Erlang distribution.
+* Allow using custom logger formatters when using the OTP 21 `logger` handler
+  (thanks to @robinchew)
 
 ### 3.4.5
 
