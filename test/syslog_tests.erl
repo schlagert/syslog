@@ -401,7 +401,7 @@ read(State = #state{devices = [Device | _]}) ->
                     put(acc, Acc ++ Data),
                     read(State)
             after
-                500 -> timeout
+                2000 -> timeout
             end;
         {error, {file, IoDevice, _}} ->
             case file:read_line(IoDevice) of
