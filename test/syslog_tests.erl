@@ -288,7 +288,7 @@ setup(Protocol, Transport, LogLevel) ->
 %%------------------------------------------------------------------------------
 setup(Protocol, udp, LogLevel, Limit, Integrate) ->
     {ok, Started} = setup_apps({Protocol, udp}, LogLevel, Limit, Integrate),
-    {ok, Socket} = gen_udp:open(?TEST_PORT, [list, {reuseaddr, true}]),
+    {ok, Socket} = gen_udp:open(?TEST_PORT, [list]),
     ok = empty_mailbox(),
     #state{started = Started, devices = [{gen_udp, Socket}]};
 setup(Protocol, tcp, LogLevel, Limit, Integrate) ->
