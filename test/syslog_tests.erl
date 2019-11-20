@@ -195,25 +195,6 @@ error_logger_test_() ->
             fun() -> ok end
     end.
 
-extra_crash_report_test_() ->
-    {timeout,
-     5,
-     fun() ->
-             State = setup(rfc3164, udp, debug),
-
-             %% test (extra) crash_report
-
-             Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
-             Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
-             Proc = pid_to_list(Pid),
-
-             Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
-                 Proc ++ " - exited with {exit,test_reason}",
-             ?assertEqual(ok, wait_for(State, Re)),
-
-             teardown(State)
-     end}.
-
 unicode_test_() ->
     {timeout,
      5,
@@ -270,6 +251,25 @@ lager_integration_test_() ->
                  _ ->
                      ok %% no lager available, e.g. rebar2 build?
              end,
+             teardown(State)
+     end}.
+
+extra_crash_report_test_() ->
+    {timeout,
+     5,
+     fun() ->
+             State = setup(rfc3164, udp, debug),
+
+             %% test (extra) crash_report
+
+             Pid = proc_lib:spawn(fun() -> exit(test_reason) end),
+             Date = ?RFC3164_DATE ++ " " ++ ?RFC3164_TIME,
+             Proc = pid_to_list(Pid),
+
+             Re = "<27>" ++ Date ++ " .+ \\w+\\[\\d+\\] " ++
+                 Proc ++ " - exited with {exit,test_reason}",
+             ?assertEqual(ok, wait_for(State, Re)),
+
              teardown(State)
      end}.
 
@@ -401,7 +401,7 @@ read(State = #state{devices = [Device | _]}) ->
                     put(acc, Acc ++ Data),
                     read(State)
             after
-                2000 -> timeout
+                1000 -> timeout
             end;
         {error, {file, IoDevice, _}} ->
             case file:read_line(IoDevice) of
