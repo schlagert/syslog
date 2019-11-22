@@ -330,6 +330,7 @@ setup_apps(Protocol, LogLevel, Limit, Integrate) ->
 teardown(#state{started = Started, devices = Devices}) ->
     lists:foreach(fun application:stop/1, Started),
     application:unload(syslog),
+    erase(acc),
     lists:foreach(
       fun({file, IoDevice, File}) ->
               file:close(IoDevice),
@@ -353,8 +354,11 @@ ensure_loaded(App) ->
 %%------------------------------------------------------------------------------
 wait_for(State, Pattern) ->
     case expect(State, Pattern) of
-        {nomatch, _, _} -> wait_for(State, Pattern);
-        Other           -> Other
+        {nomatch, L, _} ->
+            io:format(standard_error, "Skipping line ~s~n", [L]),
+            wait_for(State, Pattern);
+        Other ->
+            Other
     end.
 
 %%------------------------------------------------------------------------------
