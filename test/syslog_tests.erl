@@ -258,7 +258,7 @@ extra_crash_report_test_() ->
     {timeout,
      5,
      fun() ->
-             State = setup(rfc3164, udp, debug),
+             State = setup(rfc3164, tcp, debug),
 
              %% test (extra) crash_report
 
