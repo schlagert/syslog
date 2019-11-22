@@ -185,14 +185,18 @@ The `syslog` application uses the recommended way to integrate with the OTP-21
 logger by utilizing the `logger:add_handlers/1` function on application startup.
 This enables user to configure the integration through the `sys.config` of their
 release. By default, `syslog` will add a single `logger` handler with the id
-`syslog`. To use `syslog` as the one (and only) default handler in your release
-you'll need something like the following in your `sys.config`:
+`syslog`.
+
+To use `syslog` as the one (and only) default handler in your release you'll
+need something like the following in your `sys.config`:
 ```erlang
 [
  {kernel, [{logger, [{handler, default, undefined}]}]},
  {syslog, [{logger, [{handler, default, syslog_logger_h, #{}}]}]}
 ]
 ```
+However, keep in mind that it is not necessary to make `syslog` your
+default/primary log handler. It can also only be an additional handler.
 
 Similar to the `lager` backend, the `logger` handler is capable of conversion of
 metadata to structured data, e.g. if you want to include the metadata mappings
@@ -214,7 +218,9 @@ Of course it is allowed to configure multiple structured data mappings, by
 default no metadata is packed as structured data.
 
 Additional handler configuration may be passed using the handler argument map
-like it would be done with other `logger` handlers.
+like it would be done with other `logger` handlers. __However__, progress report
+filtering is strictly controlled by the `syslog` application environment and
+filtering (discarding) of remote log events is always enabled.
 
 Finally, to completely disable the `logger` integration (similar to setting
 `syslog_error_logger` to `false` in pre-OTP-21 releases) you'll have to
@@ -424,6 +430,8 @@ were blocked over 10 seconds.
   used for Erlang distribution.
 * Allow using custom logger formatters when using the OTP 21 `logger` handler
   (thanks to @robinchew)
+* Fix progress report filtering when using the OTP 21 `logger` handler
+  (thanks to @juise)
 
 ### 3.4.5
 
