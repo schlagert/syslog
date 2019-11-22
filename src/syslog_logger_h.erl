@@ -256,8 +256,13 @@ verify_cfg(Cfg) when is_map(Cfg) ->
 
     NoProgress = syslog_lib:get_property(no_progress, ?SYSLOG_NO_PROGRESS),
     ProgressAction = case NoProgress of true -> stop; false -> log end,
-    Filters = [{progress, {fun logger_filters:progress/2, ProgressAction}}],
-    Cfg2 = maps_put_into_filters_if_not_present(filters, Filters, Cfg1),
+    ProgressFilter = {progress, {fun logger_filters:progress/2, ProgressAction}},
+    RemoteGlFilter = {remote_gl, {fun logger_filters:remote_gl/2, stop}},
+    CustomFilters = lists:foldl(fun(F, Fs) -> lists:keydelete(F, 1, Fs) end,
+                                maps_get(filters, Cfg1, []),
+                                [progress, remote_gl]),
+    Filters = [ProgressFilter, RemoteGlFilter | CustomFilters],
+    Cfg2 = maps:put(filters, Filters, Cfg1),
 
     {ok, case maps:find(formatter, Cfg2) of
              error ->
@@ -287,17 +292,4 @@ maps_put_if_not_present(Key, Value, Map) ->
     case maps:find(Key, Map) of
         {ok, _} -> Map;
         error   -> maps:put(Key, Value, Map)
-    end.
-
-maps_put_into_filters_if_not_present(Key, Value, Map) ->
-    case maps:find(Key, Map) of
-        {ok, Filters} ->
-            case lists:keyfind(progress, 1, Filters) of
-                false ->
-                    maps:put(Key, Filters ++ Value, Map);
-                _ ->
-                    Map
-            end;
-        error ->
-            maps:put(Key, Value, Map)
     end.
