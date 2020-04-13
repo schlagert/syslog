@@ -167,7 +167,7 @@ get_pid(N) ->
 -spec get_utc_datetime(erlang:timestamp() | pos_integer()) -> syslog:datetime().
 get_utc_datetime(SystemTime) when is_integer(SystemTime), SystemTime > 0 ->
     MilliSecs = SystemTime div 1000,
-    MicroSecs = SystemTime rem 1000,
+    MicroSecs = SystemTime rem 1000000,
     Datetime = calendar:system_time_to_universal_time(MilliSecs, millisecond),
     {Datetime, MicroSecs};
 get_utc_datetime({MegaSecs, Secs, MicroSecs}) ->
