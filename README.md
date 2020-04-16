@@ -432,6 +432,8 @@ were blocked over 10 seconds.
   (thanks to @robinchew)
 * Fix progress report filtering when using the OTP 21 `logger` handler
   (thanks to @juise)
+* Fix millisecond time resolution when using the OTP 21 `logger` handler
+  (#21, thanks to @juise)
 
 ### 3.4.5
 
