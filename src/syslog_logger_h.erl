@@ -267,7 +267,8 @@ verify_cfg(Cfg) when is_map(Cfg) ->
     {ok, case maps:find(formatter, Cfg2) of
              error ->
                  maps:put(formatter, ?FORMATTER, Cfg2);
-             {ok, {logger_formatter, #{}}} -> %% the OTP default
+             {ok, {logger_formatter, FormatterCfg}}
+               when map_size(FormatterCfg) =:= 0 -> %% the OTP default
                  maps:put(formatter, ?FORMATTER, Cfg2);
              {ok, _} ->
                  Cfg2
