@@ -168,28 +168,27 @@ log_impl(LogEvent = #{level := Level, msg := Msg, meta := Metadata},
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log_extra_report(Pid, Time, Overrides, {Class, Reason, [{M, F, FunArgs, Ps} | _]})
-  when is_list(FunArgs) ->
-    As = lists:join($,, [io_lib:format("~w", [A]) || A <- FunArgs]),
-    Fmt = "exited with ~w at ~s:~s(~s)~s",
-    Args = [{Class, Reason}, M, F, As, get_line(Ps)],
-    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
-log_extra_report(Pid, Time, Overrides, {Class, Reason, [{M, F, Arity, Ps} | _]})
-  when is_integer(Arity) ->
-    Fmt = "exited with ~w at ~s:~s/~w~s",
-    Args = [{Class, Reason}, M, F, Arity, get_line(Ps)],
-    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
-log_extra_report(Pid, Time, Overrides, {Class, Reason, _}) ->
-    Fmt = "exited with ~w",
-    Args = [{Class, Reason}],
-    syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
-log_extra_report(Pid, Time, Overrides, {Class, {Reason, Stack}})
-  when is_list(Stack) ->
-    log_extra_report(Pid, Time, Overrides, {Class, Reason, Stack});
-log_extra_report(Pid, Time, Overrides, Reason) ->
-    Fmt = "exited with ~w",
-    Args = [Reason],
+log_extra_report(Pid, Time, Overrides, ErrorInfo) ->
+    {Fmt, Args} = extra_report(ErrorInfo),
     syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+extra_report({Class, Reason, [{M, F, Args, Ps} | _]})
+  when is_list(Args) ->
+    As = lists:join($,, [io_lib:format("~w", [A]) || A <- Args]),
+    {"exited with ~w at ~s:~s(~s)~s", [{Class, Reason}, M, F, As, get_line(Ps)]};
+extra_report({Class, Reason, [{M, F, Arity, Ps} | _]})
+  when is_integer(Arity) ->
+    {"exited with ~w at ~s:~s/~w~s", [{Class, Reason}, M, F, Arity, get_line(Ps)]};
+extra_report({Class, Reason, _}) ->
+    {"exited with ~w", [{Class, Reason}]};
+extra_report({Class, {Reason, Stack}})
+  when is_list(Stack) ->
+    extra_report({Class, Reason, Stack});
+extra_report(Reason) ->
+    {"exited with ~w", [Reason]}.
 
 %%------------------------------------------------------------------------------
 %% @private
