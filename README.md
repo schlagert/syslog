@@ -434,6 +434,8 @@ were blocked over 10 seconds.
   (thanks to @juise)
 * Fix millisecond time resolution when using the OTP 21 `logger` handler
   (#21, thanks to @juise)
+* Fix application of the default `syslog` formatter configuration
+ (#22, thanks to @dmitrivereshchagin)
 
 ### 3.4.5
 
