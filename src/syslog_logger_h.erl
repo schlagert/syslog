@@ -168,9 +168,9 @@ log_impl(LogEvent = #{level := Level, msg := Msg, meta := Metadata},
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-log_extra_report(Pid, Time, Overrides, {Class, Reason, [{M, F, Args, Ps} | _]})
-  when is_list(Args) ->
-    As = lists:join($,, [io_lib:format("~w", [A]) || A <- Args]),
+log_extra_report(Pid, Time, Overrides, {Class, Reason, [{M, F, FunArgs, Ps} | _]})
+  when is_list(FunArgs) ->
+    As = lists:join($,, [io_lib:format("~w", [A]) || A <- FunArgs]),
     Fmt = "exited with ~w at ~s:~s(~s)~s",
     Args = [{Class, Reason}, M, F, As, get_line(Ps)],
     syslog_logger:log(error, Pid, Time, [], Fmt, Args, Overrides);
