@@ -1,7 +1,7 @@
 language: erlang
 script: rebar3 do compile,dialyzer,eunit
 otp_release:
-  - 21.0
+  - 22.3
+  - 21.3
   - 20.3
-  - 19.3
-  - 18.3
+  - 19.0
