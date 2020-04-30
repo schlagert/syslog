@@ -436,6 +436,8 @@ were blocked over 10 seconds.
   (#21, thanks to @juise)
 * Fix application of the default `syslog` formatter configuration
  (#22, thanks to @dmitrivereshchagin)
+* Fix a badmatch when formatting crash reports originated by `proc_lib'
+ (#23, thanks to @dmitrivereshchagin)
 
 ### 3.4.5
 
