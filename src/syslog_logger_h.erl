@@ -46,8 +46,6 @@
 -define(FORMATTER, {logger_formatter,
                     #{single_line => true, template => [msg]}}).
 
--dialyzer({no_missing_calls, log_extra_report/4}).
-
 %%%=============================================================================
 %%% API
 %%%=============================================================================
