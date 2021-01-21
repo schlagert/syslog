@@ -438,6 +438,7 @@ were blocked over 10 seconds.
  (#22, thanks to @dmitrivereshchagin)
 * Fix a badmatch when formatting crash reports originated by `proc_lib'
  (#23, thanks to @dmitrivereshchagin)
+* Honor the `report_cb` feature when using the OTP 21 `logger` handler
 
 ### 3.4.5
 

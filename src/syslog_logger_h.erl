@@ -43,8 +43,7 @@
 
 -include("syslog.hrl").
 
--define(FORMATTER, {logger_formatter,
-                    #{single_line => false, template => [msg]}}).
+-define(FORMATTER, {logger_formatter, #{template => [msg]}}).
 
 -dialyzer({no_missing_calls, log_extra_report/4}).
 
@@ -144,24 +143,35 @@ log_impl(LogEvent = #{level := Level, msg := Msg, meta := Metadata},
     Pid = maps_get(pid, Metadata, self()),
     Time = maps_get(time, Metadata, os:timestamp()),
     SD = structured_data(Msg, Metadata, HandlerCfg),
-    LogMsg = Fmt:format(LogEvent, FmtCfg),
     Overrides = overrides(Metadata, HandlerCfg),
-    case {maps:find(extra_report, HandlerCfg), Level, Msg} of
-        {{ok, true}, error, {report, #{label := {supervisor, _}}}} ->
+    case Msg of
+        {report, #{label := {supervisor, _}}} ->
+            NewFmtCfg = maps:merge(FmtCfg, Metadata),
+            LogMsg = Fmt:format(LogEvent, NewFmtCfg#{single_line => false}),
             syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format, Overrides);
-        {{ok, true}, error, {report, #{label := {_, terminate}}}} ->
+        {report, #{label := {_, terminate}}} ->
+            NewFmtCfg = maps:merge(FmtCfg, Metadata),
+            LogMsg = Fmt:format(LogEvent, NewFmtCfg#{single_line => false}),
             syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format, Overrides);
-        {{ok, true}, error, {report, Report = #{label := {_, crash}}}} ->
+        {report, Report = #{label := {_, crash}}} ->
+            NewFmtCfg = maps:merge(FmtCfg, Metadata),
+            LogMsg = Fmt:format(LogEvent, NewFmtCfg#{single_line => false}),
             syslog_logger:log(crash, Pid, Time, SD, LogMsg, no_format, Overrides),
-            case maps_get(report, Report, []) of
-                [ProcEnv | _] when is_list(ProcEnv) ->
-                    ErrorInfo = proplists:get_value(error_info, ProcEnv),
-                    log_extra_report(Pid, Time, Overrides, ErrorInfo);
+            case maps:find(extra_report, HandlerCfg) of
+                {ok, true} ->
+                    case maps:find(report, Report) of
+                        {ok, [ProcEnv | _]} when is_list(ProcEnv) ->
+                            ErrorInfo = proplists:get_value(error_info, ProcEnv),
+                            log_extra_report(Pid, Time, Overrides, ErrorInfo);
+                        _ ->
+                            ok
+                    end;
                 _ ->
                     ok
             end;
-        _ ->
+        Msg ->
             Severity = level_to_severity(Level),
+            LogMsg = Fmt:format(LogEvent, maps:merge(FmtCfg, Metadata)),
             syslog_logger:log(Severity, Pid, Time, SD, LogMsg, no_format, Overrides)
     end.
 
