@@ -418,6 +418,10 @@ were blocked over 10 seconds.
 
 ## History
 
+### Master (4.1.0)
+
+Currently no changes to latest release.
+
 ### 4.0.0
 
 * Add proper support for the new

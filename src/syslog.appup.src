@@ -13,8 +13,9 @@
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
-{"4.0.0",
+{"4.1.0",
  [
+  {"4.0.0", [{restart_application, syslog}]},
   {"3.4.5", [{restart_application, syslog}]},
   {"3.4.4", [{restart_application, syslog}]},
   {"3.4.3", [{restart_application, syslog}]},
@@ -31,6 +32,7 @@
   {"0.0.9", [{restart_application, syslog}]}
  ],
  [
+  {"4.0.0", [{restart_application, syslog}]},
   {"3.4.5", [{restart_application, syslog}]},
   {"3.4.4", [{restart_application, syslog}]},
   {"3.4.3", [{restart_application, syslog}]},

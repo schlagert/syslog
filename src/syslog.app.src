@@ -16,7 +16,7 @@
 {application, syslog,
  [
   {description, "An RFC 3164 and RFC 5424 compliant logging framework."},
-  {vsn, "4.0.0"},
+  {vsn, "4.1.0"},
   {registered,
    [
     syslog_logger
