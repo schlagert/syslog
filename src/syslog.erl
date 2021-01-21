@@ -60,7 +60,7 @@
                     local5 | local6 | local7.
 
 -type severity() :: emergency | alert | critical | error | warning | notice |
-                    informational | debug | crash.
+                    info | informational | debug | crash.
 
 -type proc_name() :: atom() | pid() | string().
 

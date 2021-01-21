@@ -508,6 +508,7 @@ map_severity(critical)      -> ?SYSLOG_CRITICAL;
 map_severity(error)         -> ?SYSLOG_ERROR;
 map_severity(warning)       -> ?SYSLOG_WARNING;
 map_severity(notice)        -> ?SYSLOG_NOTICE;
+map_severity(info)          -> ?SYSLOG_INFO;
 map_severity(informational) -> ?SYSLOG_INFO;
 map_severity(debug)         -> ?SYSLOG_DEBUG.
 
