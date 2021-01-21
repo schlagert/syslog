@@ -418,7 +418,7 @@ were blocked over 10 seconds.
 
 ## History
 
-### Master (4.0.0)
+### 4.0.0
 
 * Add proper support for the new
   [OTP 21 Logger API](http://erlang.org/doc/apps/kernel/logger_chapter.html):
