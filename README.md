@@ -1,7 +1,5 @@
 # syslog
 
-[![Build Status](https://travis-ci.org/schlagert/syslog.png?branch=master)](https://travis-ci.org/schlagert/syslog)
-
 A Syslog-based logging framework and/or OTP `logger` handler for Erlang. This
 project is inspired by the great work put in the two projects
 [sasl_syslog](http://github.com/travelping/sasl_syslog) and
