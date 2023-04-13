@@ -83,7 +83,9 @@ log(LogEvent, Cfg) ->
     try
         log_impl(LogEvent, Cfg)
     catch
-        _:_ -> ?ERR("~s - failed to process log event ~w", [?MODULE, LogEvent])
+        Class:Exception:Stacktrace ->
+            ?ERR("~s - failed to process log event ~w with ~w:~w at ~p",
+                 [?MODULE, LogEvent, Class, Exception, Stacktrace])
     end.
 
 %%------------------------------------------------------------------------------
