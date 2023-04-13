@@ -22,22 +22,22 @@
 %%% TESTS
 %%%=============================================================================
 
-monitor_test() ->
+monitor_test_() ->
     process_flag(trap_exit, true),
-
-    {ok, Started} = application:ensure_all_started(syslog),
-
-    case syslog_lib:has_error_logger() of
-        true ->
-            ?assert(has_hander(syslog_error_h, error_logger)),
-            gen_event:delete_handler(error_logger, syslog_error_h, []),
-            timer:sleep(500),
-            ?assert(has_hander(syslog_error_h, error_logger));
-        false ->
-            ok
-    end,
-
-    ok = lists:foreach(fun application:stop/1, Started).
+    {setup,
+     fun() -> {ok, _} = application:ensure_all_started(syslog) end,
+     fun({ok, Apps}) -> ok = lists:foreach(fun application:stop/1, Apps) end,
+     fun() ->
+             case syslog_lib:has_error_logger() of
+                 true ->
+                     ?assert(has_hander(syslog_error_h, error_logger)),
+                     gen_event:delete_handler(error_logger, syslog_error_h, []),
+                     timer:sleep(500),
+                     ?assert(has_hander(syslog_error_h, error_logger));
+                 false ->
+                     ok
+             end
+     end}.
 
 %%%=============================================================================
 %%% internal functions
