@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright 2017-2021, Tobias Schlager <schlagert@github.com>
+%%% Copyright 2017-2023, Tobias Schlager <schlagert@github.com>
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -13,8 +13,9 @@
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
-{"4.1.0",
+{"5.0.0",
  [
+  {"4.1.0", [{restart_application, syslog}]},
   {"4.0.0", [{restart_application, syslog}]},
   {"3.4.5", [{restart_application, syslog}]},
   {"3.4.4", [{restart_application, syslog}]},
@@ -32,6 +33,7 @@
   {"0.0.9", [{restart_application, syslog}]}
  ],
  [
+  {"4.1.0", [{restart_application, syslog}]},
   {"4.0.0", [{restart_application, syslog}]},
   {"3.4.5", [{restart_application, syslog}]},
   {"3.4.4", [{restart_application, syslog}]},

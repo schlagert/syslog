@@ -416,9 +416,9 @@ were blocked over 10 seconds.
 
 ## History
 
-### Master (4.1.0)
+### Master (5.0.0)
 
-Currently no changes to latest release.
+* Drop support for OTP releases older than OTP 21
 
 ### 4.0.0
 
