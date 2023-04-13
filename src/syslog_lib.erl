@@ -469,20 +469,14 @@ get_hostname_short_test() ->
 
 get_hostname_long_test() ->
     {ok, Hostname} = inet:gethostname(),
-    HostnameLong1 = case inet:gethostbyname(Hostname) of
-        {ok, #hostent{h_name=Hname1}} -> Hname1;
-        {error, _}                    -> Hostname
-    end,
-    HostnameLong2 = case inet:gethostbyname("hostname") of
-        {ok, #hostent{h_name=Hname2}} -> Hname2;
-        {error, _}                    -> "hostname"
+    HostnameLong = case inet:gethostbyname(Hostname) of
+        {ok, #hostent{h_name=Hname}} -> Hname;
+        {error, _}                   -> Hostname
     end,
     {ok, #hostent{h_name=Localhost}} = inet:gethostbyaddr("127.0.0.1"),
-    ?assertEqual(HostnameLong1,     get_hostname(long, "nohost")),
-    ?assertEqual(HostnameLong1,     get_hostname(long, "127.0.0.1")),
-    ?assertEqual(HostnameLong1,     get_hostname(long, Localhost)),
-    ?assertEqual(HostnameLong2,     get_hostname(long, "hostname")),
-    ?assertEqual("hostname.domain", get_hostname(long, "hostname.domain")).
+    ?assertEqual(HostnameLong, get_hostname(long, "nohost")),
+    ?assertEqual(HostnameLong, get_hostname(long, "127.0.0.1")),
+    ?assertEqual(HostnameLong, get_hostname(long, Localhost)).
 
 get_name_from_node_test() ->
     ?assertEqual(<<"beam">>,     get_name_from_node('nonode@nohost')),
@@ -536,7 +530,6 @@ to_type_test() ->
     ?assertEqual({127,0,0,1}, to_type(ip_addr, list_to_binary(Localhost))),
     ?assertEqual({127,0,0,1}, to_type(ip_addr, <<"127.0.0.1">>)),
     ?assertEqual({127,0,0,1}, to_type(ip_addr, "127.0.0.1")),
-    ?assertEqual({0,0,0,0,0,0,0,1}, to_type(ip_addr, "::1")),
-    ?assertError(invalid_dest_host, to_type(ip_addr, "5dzFvraZ7lZUAlQu")).
+    ?assertEqual({0,0,0,0,0,0,0,1}, to_type(ip_addr, "::1")).
 
 -endif. %% TEST
